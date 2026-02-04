@@ -1,0 +1,458 @@
+:root {
+  --bg: #ffffff;
+  --glass: rgba(124, 124, 124, 0.85);
+  --accent: #007AFF;
+  --text-dim: rgba(0, 0, 0, 0.3);
+}
+
+* { 
+  box-sizing: border-box; 
+  -webkit-tap-highlight-color: transparent; 
+}
+
+/* Desabilitar seleção e touch apenas em elementos que não são interativos */
+#board, .visor-container, .footer-container, .panel-header, .setup-group label {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  overflow: hidden;
+  position: relative;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+}
+
+#board {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  z-index: 1;
+}
+
+/* Aviso de Orientação */
+#orientationWarning {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.9); z-index: 9999;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  color: white; padding: 20px;
+}
+#orientationWarning.hidden { display: none; }
+.warning-content svg { margin-bottom: 15px; animation: rotate 2s infinite ease-in-out; }
+@keyframes rotate { 0% { transform: rotate(0deg); } 50% { transform: rotate(-90deg); } 100% { transform: rotate(0deg); } }
+
+/* Toolbar iOS 26 - Floating Pill */
+#toolbar {
+  position: absolute;
+  left: 50%;
+  top: 85%;
+  transform: translateX(-50%);
+  height: 62px;
+  min-width: 320px;
+  max-width: 95%;
+  background: var(--glass);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border-radius: 31px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  gap: 6px;
+  z-index: 1000;
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+}
+
+.tool-item {
+  height: 46px;
+  width: 46px;
+  border-radius: 23px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  display: flex;
+  align-items: center; justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.tool-item:active { background: rgba(255, 255, 255, 0.15); transform: scale(0.9); }
+
+.color-separator {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 4px;
+}
+
+#swatchGroup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 6px;
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  border: 0;
+  background: var(--c);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  cursor: pointer;
+}
+
+.swatch::after {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+}
+
+.swatch.active {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 2.5px #fff, 0 4px 15px rgba(0,0,0,0.25);
+}
+
+/* Indicação visual interna removida conforme solicitado */
+.swatch.swipe-active::before {
+  display: none;
+}
+
+/* Animação para o ponto no Visor Principal */
+.loading-dots-animation::after {
+  content: ".";
+  animation: loading-dots-text 1.5s infinite steps(1);
+}
+
+@keyframes loading-dots-text {
+  0% { content: "."; }
+  33% { content: ".."; }
+  66% { content: "..."; }
+  100% { content: "."; }
+}
+
+/* Visor Unificado */
+.visor-container, .footer-container {
+  position: absolute;
+  z-index: 500;
+  pointer-events: none;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 400;
+  color: #000000;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  white-space: pre-wrap;
+  width: 300px;
+  transform: translateX(-50%);
+  line-height: 1.1;
+}
+
+.footer-container {
+  opacity: 1;
+  font-weight: 400;
+  width: auto;
+  white-space: nowrap;
+  min-width: 100%;
+}
+
+/* Painéis (Setup e Treino) */
+.panel {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  transform: translateX(-50%);
+  width: 380px;
+  max-width: 90%;
+  max-height: 80vh;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 28px;
+  padding: 0;
+  z-index: 2000;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  border: 0.5px solid rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.panel.hidden { display: none !important; }
+.panel.transparent-peek { opacity: 0.05 !important; transition: opacity 0.2s ease; pointer-events: none; }
+
+.panel-header { 
+  padding: 16px 20px 12px;
+  font-size: 18px; font-weight: 700; text-align: center;
+  border-bottom: 0.5px solid rgba(0,0,0,0.05);
+  flex-shrink: 0;
+}
+
+.scroll-content {
+  padding: 12px 20px 20px;
+  overflow-y: auto;
+  flex-grow: 1;
+  -webkit-overflow-scrolling: touch;
+  pointer-events: auto;
+}
+.scroll-content::-webkit-scrollbar { width: 4px; }
+.scroll-content::-webkit-scrollbar-track { background: transparent; }
+.scroll-content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
+
+.panel-footer {
+  padding: 12px 20px 20px;
+  border-top: 0.5px solid rgba(0,0,0,0.05);
+  flex-shrink: 0;
+}
+
+.setup-group { margin: 14px 0; }
+.setup-group label { display: block; font-size: 12px; font-weight: 600; color: #8e8e93; text-transform: uppercase; margin-bottom: 8px; }
+
+.setup-grid, .control-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.control-grid { grid-template-columns: repeat(3, 1fr); }
+
+.setup-btn, .ctrl-btn, .action-btn, .mini-btn, .card-btn {
+  border: 0; padding: 14px; border-radius: 14px; background: #f2f2f7; font-weight: 600; color: #1c1c1e; font-size: 14px;
+  transition: all 0.2s ease;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+}
+.setup-btn.active, .mini-btn.active, .card-btn.active { background: var(--accent) !important; color: #fff !important; }
+
+.action-btn { width: 100%; margin-top: 10px; }
+.action-btn.primary { background: var(--accent); color: #fff; }
+
+.train-num { font-size: 54px; font-weight: 800; text-align: center; color: var(--accent); margin-bottom: 20px; }
+.train-controls { display: flex; align-items: center; gap: 12px; }
+
+/* Seletor de Cartas */
+.card-input-display {
+  background: #f2f2f7; padding: 15px; border-radius: 15px;
+  text-align: center; font-size: 24px; font-weight: 800; margin-bottom: 15px;
+  color: var(--accent); letter-spacing: 2px;
+}
+.card-grid { display: grid; gap: 6px; }
+.card-grid.values { grid-template-columns: repeat(5, 1fr); }
+.card-grid.suits { grid-template-columns: repeat(4, 1fr); }
+.card-grid.digits { grid-template-columns: repeat(5, 1fr); }
+
+.card-btn { padding: 12px 5px; font-size: 14px; }
+
+/* Estilos para o Botão de Olho (Transparência) */
+.eye-button {
+  background: transparent; border: none; color: #8e8e93; padding: 5px;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.2s ease, transform 0.1s ease; border-radius: 50%;
+}
+.eye-button svg { width: 28px; height: 28px; }
+.eye-button:active { color: var(--accent); transform: scale(0.9); }
+
+/* Botão de fechar modal (X) */
+.close-modal-btn {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #8e8e93;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease, transform 0.1s ease;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.close-modal-btn:active {
+  color: #ff3b30;
+  transform: translateY(-50%) scale(0.9);
+}
+
+/* ==================== TELA DE ATIVAÇÃO ==================== */
+#activationScreen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
+}
+.activation-container {
+  width: 100%; max-width: 400px; background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-radius: 30px; padding: 40px 30px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+.activation-logo { font-size: 48px; font-weight: 900; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 10px; }
+.activation-title { font-size: 24px; font-weight: 700; color: #1c1c1e; margin-bottom: 10px; }
+.activation-subtitle { font-size: 15px; color: #8e8e93; margin-bottom: 30px; line-height: 1.4; }
+.activation-input {
+  width: 100%; padding: 20px; border: 2px solid #e5e5ea; border-radius: 16px;
+  font-size: 18px; font-weight: 600; text-align: center; text-transform: uppercase;
+  background: #f9f9f9; color: #1c1c1e; cursor: text !important;
+}
+.activation-button {
+  width: 100%; padding: 18px; border: none; border-radius: 16px;
+  font-size: 17px; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+.activation-footer { margin-top: 30px; font-size: 12px; color: #8e8e93; line-height: 1.5; }
+.activation-device-id { margin-top: 20px; padding: 12px; background: rgba(0, 0, 0, 0.05); border-radius: 10px; font-size: 11px; color: #8e8e93; font-family: monospace; }
+
+/* Estilos para Instalação Obrigatória */
+#installScreen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
+}
+.install-instructions { text-align: left; margin: 20px 0; background: #f2f2f7; padding: 20px; border-radius: 20px; }
+.install-instructions .step { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; font-size: 14px; color: #1c1c1e; }
+.step-num { background: var(--accent); color: #fff; width: 24px; height: 24px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+
+.hidden { display: none !important; }
+
+/* Novos Controles de Ajuste Compactos */
+.stepper-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+
+.stepper-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8e8e93;
+  text-transform: uppercase;
+  flex-grow: 1;
+}
+
+.stepper-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 35px;
+  text-align: center;
+}
+
+.stepper-btn {
+  background: #fff;
+  border: 0.5px solid rgba(0,0,0,0.1);
+  color: #1c1c1e;
+  font-size: 16px;
+  font-weight: 700;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: all 0.1s ease;
+}
+
+.stepper-btn:active {
+  background: #f2f2f7;
+  transform: scale(0.9);
+}
+
+.slider-control {
+  margin: 12px 0;
+  padding: 0 4px;
+}
+
+.slider-label-group {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.slider-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8e8e93;
+  text-transform: uppercase;
+}
+
+.slider-value-display {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.range-slider {
+  width: 100%;
+  -webkit-appearance: none;
+  height: 4px;
+  background: #e5e5ea;
+  outline: none;
+  border-radius: 2px;
+}
+
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  cursor: pointer;
+}
+
+/* Input numérico nos controles stepper */
+.stepper-input {
+  width: 50px;
+  height: 28px;
+  border: 0.5px solid rgba(0,0,0,0.1);
+  border-radius: 8px;
+  background: #fff;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  padding: 0 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+}
+
+.stepper-input::-webkit-inner-spin-button,
+.stepper-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.stepper-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+}
+
+.stepper-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 10px;
+  padding: 6px 10px;
+}

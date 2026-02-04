@@ -1,0 +1,805 @@
+(() => {
+  const board = document.getElementById("board");
+  const ctx = board?.getContext("2d", { alpha: true });
+  const visor = document.getElementById("visor");
+  const visorL1 = document.getElementById("visorLine1");
+  const footer = document.getElementById("footer");
+  const setupPanel = document.getElementById("setupPanel");
+  const trainPanel = document.getElementById("trainPanel");
+  const cardsPanel = document.getElementById("panelCards");
+  const trainNumEl = document.getElementById("trainNumDisplay");
+  const cardInputDisplay = document.getElementById("cardInputDisplay");
+  const cardsAdjustControls = document.getElementById("cardsAdjustControls");
+
+  let W = window.innerWidth, H = window.innerHeight, DPR = window.devicePixelRatio || 1;
+
+  let mode = "draw"; 
+  let color = "#111111";
+  let strokes = [];
+  let currentStroke = null;
+  let swipeData = { start: null, arrows: [] };
+  let cardInputData = { rank: "", suit: "", digits: "" };
+  let tempTopCard = null; // Armazena a carta do topo temporária (botão amarelo)
+  let isYellowSwipe = false; // Indica se o swipe atual é do botão amarelo
+  
+  let tapCounts = { red: 0, yellow: 0 };
+  let lastTapTimes = { red: 0, yellow: 0 };
+  
+  let trainNum = 1;
+  let adjTarget = "visor";
+  let lastResult = ""; 
+  let lastFooterResult = ""; 
+  let adjustMode = "number";
+  let isCardsAdjustMode = false;
+  let peekTimer = null;
+
+  let cfg = JSON.parse(localStorage.getItem("mnem_v6_cfg") || JSON.stringify({
+    visor: { x: 50, y: 80, s: 15, lh: 1.1, y2: 0, text: "…", label: "Peek Principal", inverted: false, useEmoji: false, o: 0.3 },
+    number: { x: 12.5, y: 34, s: 75, h: 41, label: "Número" },
+    footer: { x: 50, y: 90, s: 10, o: 0.3, text: "Sethi Draw v.1.0.2 (1.4.2814)", label: "Peek de Apoio" },
+    peek: { x: 50, y: 82, s: 15, text: "", label: "Peek" },
+    toolbar: { x: 50, y: 50, s: 1, label: "Barra de Ferramentas" },
+    panelSetup: { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Configurações" },
+    panelTrain: { x: 50, y: 30, s: 1, o: 0.6, label: "Desenhos de Números" },
+    panelCards: { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Cartas" },
+    inputType: "swipe",
+    peekDuration: 1.0
+  }));
+
+  const ensureCfg = () => {
+    Object.keys(cfg).forEach(k => { if (cfg[k] && typeof cfg[k] === 'object' && cfg[k].visible === undefined) cfg[k].visible = true; });
+    if (cfg.visor.useEmoji === undefined) cfg.visor.useEmoji = false;
+    if (cfg.visor.peekStyle === undefined) cfg.visor.peekStyle = "both";
+    if (cfg.visor.o === undefined) cfg.visor.o = 0.3;
+    if (cfg.footer.o === undefined) cfg.footer.o = 0.3;
+    if (cfg.inputType === undefined) cfg.inputType = "swipe";
+    cfg.peekDuration = 1.0;
+    if (!cfg.panelSetup) cfg.panelSetup = { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Configurações" };
+    if (!cfg.panelTrain) cfg.panelTrain = { x: 50, y: 30, s: 1, o: 0.6, label: "Desenhos de Números" };
+    if (!cfg.panelCards) cfg.panelCards = { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Cartas" };
+    
+    cfg.visor.label = "Peek Principal";
+    cfg.footer.label = "Peek de Apoio";
+    cfg.toolbar.label = "Barra de Ferramentas";
+    cfg.panelSetup.label = "Painel de Configurações";
+    cfg.panelTrain.label = "Desenhos de Números";
+    cfg.panelCards.label = "Painel de Cartas";
+    
+    // Sincronizar opacidade e tamanho entre visor e footer
+    if (cfg.visor.o !== cfg.footer.o) cfg.footer.o = cfg.visor.o;
+    if (cfg.visor.s !== cfg.footer.s) cfg.footer.s = cfg.visor.s;
+  };
+  ensureCfg();
+
+  const STACK = ["4C","2H","7D","3C","4H","6D","AS","5H","9S","2S","QH","3D","QC","8H","6S","5S","9H","KC","2D","JH","3S","8S","6H","10C","5D","KD","2C","3H","8D","5C","KS","JD","8C","10S","KH","JC","7S","10H","AD","4S","7H","4D","AC","9C","JS","QD","7C","QS","10D","6C","AH","9D"];
+  const posMap = {}; STACK.forEach((c, i) => posMap[c] = i + 1);
+
+  const init = () => {
+    window.addEventListener('resize', onResize);
+    onResize();
+    bindEvents();
+    initEyeButton("eyeBtn", "setupPanel");
+    initEyeButton("eyeBtnTrain", "trainPanel");
+    initBlueButtonPeek();
+    checkOrientation();
+    window.addEventListener('orientationchange', checkOrientation);
+    updateAdjustUI();
+  };
+
+  const checkOrientation = () => {
+    const warning = document.getElementById("orientationWarning");
+    if (window.innerWidth < window.innerHeight) { warning.classList.remove("hidden"); }
+    else { warning.classList.add("hidden"); }
+  };
+
+  const onResize = () => {
+    setTimeout(() => {
+      W = window.innerWidth; H = window.innerHeight; DPR = window.devicePixelRatio || 1;
+      board.width = W * DPR; board.height = H * DPR;
+      board.style.width = W + "px"; board.style.height = H + "px";
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      applyCfg(); render(); checkOrientation();
+    }, 100);
+  };
+
+  const getExamplePeek = () => {
+    const cardStr = cfg.visor.useEmoji ? "3♥️" : "3H";
+    const numStr = "14";
+    if (cfg.visor.peekStyle === "cardOnly") return cardStr;
+    return cfg.visor.inverted ? `${numStr} ${cardStr}` : `${cardStr} ${numStr}`;
+  };
+
+  const applyCfg = () => {
+    visor.style.display = cfg.visor.visible ? "block" : "none";
+    visor.style.left = (cfg.visor.x * W / 100) + "px";
+    visor.style.top = (cfg.visor.y * H / 100) + "px";
+    visor.style.fontSize = cfg.visor.s + "px";
+    visor.style.lineHeight = cfg.visor.lh;
+    
+    if (mode === "setup" || mode === "train" || mode === "cards") {
+      visor.style.opacity = cfg.visor.o;
+      visorL1.textContent = lastResult || getExamplePeek();
+      visorL1.classList.remove("loading-dots-animation");
+    } else if (mode === "draw") {
+      visor.style.opacity = 0;
+      visorL1.textContent = cfg.visor.text;
+      visorL1.classList.remove("loading-dots-animation");
+    } else if (mode === "swipe") {
+      visor.style.opacity = cfg.visor.o;
+      // Animação Inteligente: pontos aparecem apenas enquanto aguarda o comando (arrows.length === 0)
+      // E apenas se o swipe ainda não começou (swipeData.start === null)
+      if (swipeData.arrows.length === 0 && !swipeData.start) {
+        visorL1.textContent = "";
+        visorL1.classList.add("loading-dots-animation");
+      } else {
+        // Sumiço Automático: ao iniciar o swipe ou ter setas, a animação para
+        visorL1.classList.remove("loading-dots-animation");
+      }
+    } else {
+      visor.style.opacity = cfg.visor.o;
+      visorL1.classList.remove("loading-dots-animation");
+    }
+    
+    footer.style.display = cfg.footer.visible ? "block" : "none";
+    footer.style.left = (cfg.footer.x * W / 100) + "px";
+    footer.style.top = (cfg.footer.y * H / 100) + "px";
+    footer.style.fontSize = cfg.footer.s + "px";
+    footer.style.opacity = cfg.footer.o;
+    
+    // Preservação Total: O footer (Peek de Apoio) SEMPRE mantém o último resultado se existir.
+    // Ele não deve sumir ou resetar para o texto padrão ao tocar no vermelho ou lixeira.
+    footer.textContent = lastFooterResult || cfg.footer.text;
+
+    const panels = { "toolbar": "toolbar", "setupPanel": "panelSetup", "trainPanel": "panelTrain", "panelCards": "panelCards" };
+    Object.keys(panels).forEach(id => {
+      const el = document.getElementById(id);
+      const c = cfg[panels[id]];
+      if (el && c) {
+        if (id === "toolbar") el.style.display = c.visible ? "flex" : "none";
+        el.style.left = (c.x * W / 100) + "px";
+        el.style.top = (c.y * H / 100) + "px";
+        el.style.transform = `translateX(-50%) scale(${c.s})`;
+        if (id !== "toolbar") el.style.background = `rgba(255, 255, 255, ${c.o})`;
+      }
+    });
+
+    document.getElementById("toggleEmojiBtn").textContent = `Símbolos de Naipes: ${cfg.visor.useEmoji ? 'ON' : 'OFF'}`;
+    document.getElementById("inputSwipeBtn").classList.toggle("active", cfg.inputType === "swipe");
+    document.getElementById("swatchGroup").querySelectorAll(".swatch").forEach(s => {
+      // O pontinho de cima (swipe-active) agora mostra a animação de carregamento (. .. ...)
+      if (s.dataset.color === "#FF3B30") s.classList.toggle("swipe-active", mode === "swipe" && !isYellowSwipe);
+      if (s.dataset.color === "#F7C600") s.classList.toggle("swipe-active", mode === "swipe" && isYellowSwipe);
+    });
+    document.getElementById("inputCardsBtn").classList.toggle("active", cfg.inputType === "cards");
+    document.getElementById("invertOrderBtn").textContent = cfg.visor.inverted ? "Ordem: 05 4H → 4H 05" : "Ordem: 4H 05 → 05 4H";
+    document.getElementById("togglePeekStyleBtn").textContent = `Estilo: ${cfg.visor.peekStyle === 'cardOnly' ? 'Apenas Carta' : 'Carta + Posição'}`;
+    const peekPreview = document.getElementById("peekPreview");
+    if (peekPreview) peekPreview.textContent = getExamplePeek();
+
+    document.querySelectorAll(".setup-btn-target").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.target === adjTarget);
+    });
+
+    localStorage.setItem("mnem_v6_cfg", JSON.stringify(cfg));
+  };
+
+  const bindEvents = () => {
+    document.querySelectorAll(".swatch").forEach(s => {
+      s.onclick = (e) => {
+        if (s.dataset.color === "#007AFF" && s.dataset.isHolding === "true") return;
+        e.stopPropagation();
+        const now = Date.now();
+        const c = s.dataset.color;
+        document.querySelectorAll(".swatch").forEach(b => b.classList.remove("active"));
+        s.classList.add("active");
+        color = c;
+
+        const updateTap = (key, limit, action) => {
+          if (now - lastTapTimes[key] < 500) tapCounts[key]++;
+          else tapCounts[key] = 1;
+          lastTapTimes[key] = now;
+          if (tapCounts[key] >= limit) { action(); tapCounts[key] = 0; }
+        };
+
+        if (c === "#FF3B30") {
+          if (cfg.inputType === "cards") window.toggleCards(false);
+          else updateTap('red', 1, toggleSwipe);
+        }
+        if (c === "#111111") {
+          const key = 'black';
+          if (now - lastTapTimes[key] < 500) tapCounts[key]++;
+          else tapCounts[key] = 1;
+          lastTapTimes[key] = now;
+          if (tapCounts[key] >= 5) {
+            toggleSetup();
+            tapCounts[key] = 0;
+          }
+        }
+        if (c === "#F7C600") {
+          const key = 'yellow';
+          if (now - lastTapTimes[key] < 500) tapCounts[key]++;
+          else tapCounts[key] = 1;
+          lastTapTimes[key] = now;
+          
+          // Limpar qualquer timer de execução única se um novo toque vier rápido
+          if (window.yellowTapTimer) clearTimeout(window.yellowTapTimer);
+          
+          // Botão amarelo agora só para swipe (1 toque)
+          window.yellowTapTimer = setTimeout(() => {
+            if (tapCounts[key] === 1) {
+              toggleYellowSwipe();
+            }
+            tapCounts[key] = 0;
+          }, 300);
+        }
+      };
+    });
+
+
+    document.getElementById("clearBtn").onclick = (e) => { 
+      e.stopPropagation(); 
+      strokes = []; 
+      swipeData.arrows = []; 
+      window.duplicityImages = []; // Limpa as imagens do Duplicity
+      if (mode === "swipe") { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
+      if (mode === "cards") window.toggleCards();
+      tempTopCard = null;
+      applyCfg();
+      render(); 
+    };
+
+    let dragData = { active: false, startX: 0, startY: 0, initialX: 0, initialY: 0, axis: null, target: null };
+
+  window.onpointerdown = (e) => {
+    const stepperBtn = e.target.closest(".stepper-btn");
+    if (stepperBtn) {
+      const onclick = stepperBtn.getAttribute("onclick");
+      const match = onclick.match(/window\.adjust\('([^']*)', ([-.0-9]*), '([^']*)'\)/);
+      if (match) {
+        e.preventDefault();
+        const [_, axis, val, targetKey] = match;
+        dragData = { active: true, startX: e.clientX, startY: e.clientY, initialVal: cfg[targetKey][axis], axis, targetKey };
+        window.adjust(axis, parseFloat(val), targetKey);
+        return;
+      }
+    }
+
+    if (e.target.closest("#toolbar") || e.target.closest(".panel") || e.target.closest("#activationScreen") || e.target.closest("#installScreen") || e.target.closest("#orientationWarning")) return;
+    const p = getPt(e); e.preventDefault();
+    if (mode === "swipe") { 
+      swipeData.start = p; 
+      // Sumiço Automático: no exato momento em que inicia o movimento, a animação para
+      applyCfg();
+      return; 
+    }
+    currentStroke = { c: mode === "train" ? "#111111" : color, p: [p] };
+  };
+
+  window.onpointermove = (e) => {
+    if (dragData.active) {
+      const dx = e.clientX - dragData.startX;
+      const dy = e.clientY - dragData.startY;
+      const delta = Math.abs(dx) > Math.abs(dy) ? dx : -dy;
+      const sensitivity = (dragData.axis === 's' && (dragData.targetKey.startsWith('panel') || dragData.targetKey === 'toolbar')) || dragData.axis === 'o' ? 0.005 : 0.2;
+      const newVal = dragData.initialVal + delta * sensitivity;
+      window.adjustDirect(dragData.axis, newVal, dragData.targetKey);
+      return;
+    }
+    if (!currentStroke) return;
+    const p = getPt(e); e.preventDefault();
+    currentStroke.p.push(p);
+    drawSeg(currentStroke.p[currentStroke.p.length-2], p, currentStroke.c);
+  };
+
+  window.onpointerup = (e) => {
+    if (dragData.active) { dragData.active = false; return; }
+    if (mode === "swipe" && swipeData.start) {
+      const arrow = getArrow(swipeData.start, getPt(e));
+      swipeData.start = null;
+      if (arrow) { 
+        swipeData.arrows.push(arrow); 
+        updateVisorProgress(); 
+        visor.style.opacity = cfg.visor.o; 
+        const targetLen = isYellowSwipe ? 3 : 7;
+        if (swipeData.arrows.length === targetLen) resolveSwipe(); 
+      }
+    }
+    if (currentStroke) { strokes.push(currentStroke); currentStroke = null; render(); }
+  };
+};
+
+  const getPt = (e) => { const r = board.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  const drawSeg = (p1, p2, c) => {
+    ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = 6; ctx.strokeStyle = c;
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke(); ctx.restore();
+  };
+
+  const render = () => {
+    ctx.clearRect(0, 0, board.width, board.height);
+    
+    // Desenhar traços manuais (se houver)
+    strokes.forEach(s => {
+      ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = 6; ctx.strokeStyle = s.c;
+      ctx.beginPath(); ctx.moveTo(s.p[0].x, s.p[0].y);
+      for (let i = 1; i < s.p.length; i++) ctx.lineTo(s.p[i].x, s.p[i].y);
+      ctx.stroke(); ctx.restore();
+    });
+
+    // Desenhar imagens do Duplicity (se houver resultado)
+    if (window.duplicityImages && window.duplicityImages.length > 0) {
+      const startX = W * 0.1; // 10% da largura
+      const startY = H * 0.3; // 30% da altura
+      const charWidth = 60;   // Largura base de cada caractere
+      const charHeight = 80;  // Altura base
+      const lineSpacing = 100; // Espaçamento entre linhas
+
+      window.duplicityImages.forEach((line, lineIdx) => {
+        let currentX = startX;
+        line.forEach(imgObj => {
+          if (imgObj.path && imgObj.img) {
+            ctx.drawImage(imgObj.img, currentX, startY + (lineIdx * lineSpacing), charWidth, charHeight);
+            currentX += charWidth * 0.8; // Sobreposição leve para parecer natural
+          } else if (imgObj.char === ' ') {
+            currentX += charWidth;
+          }
+        });
+      });
+    }
+  };
+
+  const getArrow = (a, b) => {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    if (Math.hypot(dx, dy) < 30) return null;
+    return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "→" : "←") : (dy > 0 ? "↓" : "↑");
+  };
+
+  const formatCard = (card) => {
+    const rank = card.slice(0, -1); const suit = card.slice(-1);
+    const suitDisplay = cfg.visor.useEmoji ? ({"S":"♠️","H":"♥️","C":"♣️","D":"♦️"}[suit] || suit) : suit;
+    return rank + suitDisplay;
+  };
+
+  const updateVisorProgress = () => {
+    const arr = swipeData.arrows; const len = arr.length; let content = arr.join("");
+    if (len >= 3) {
+      const rank = {"↑→":"A","→↑":"2","→→":"3","→↓":"4","↓→":"5","↓↓":"6","↓←":"7","←↓":"8","←←":"9","←↑":"10","↑←":"J","↑↑":"Q","↑↓":"K"}[arr[0]+arr[1]];
+      const suit = {"↑":"S","→":"H","↓":"C","←":"D"}[arr[2]];
+      const card = (rank && suit) ? formatCard(rank+suit) : "??";
+      if (len === 3) content = isYellowSwipe ? `TOPO: ${card}` : card;
+      else if (len >= 5) {
+        const dec = {"↑↑":0,"↑→":10,"→↑":20,"→→":"30","→↓":40,"↓→":50}[arr[3]+arr[4]];
+        const decStr = dec !== undefined ? (dec/10).toString() : "?";
+        if (len === 5) content = `${card} ${decStr}`;
+        else if (len === 7) {
+          const unt = {"↑↑":0,"↑→":1,"→↑":2,"→→":3,"→↓":4,"↓→":5,"↓↓":6,"↓←":7,"←↓":8,"←←":"9"}[arr[5]+arr[6]];
+          const num = (dec !== undefined && unt !== undefined) ? parseInt(dec) + parseInt(unt) : "??";
+          content = `${card} ${num}`;
+        }
+      }
+    }
+    visorL1.textContent = content;
+  };
+
+  window.drawDuplicityResult = (card, pos) => {
+    const result = DUPLICITY.calculateInversion(card, pos);
+    const line1Text = `${result.line1.card} ${result.line1.pos}`;
+    const line2Text = `${result.line2.card} ${result.line2.pos}`;
+    
+    const line1Images = DUPLICITY.textToImages(line1Text);
+    const line2Images = DUPLICITY.textToImages(line2Text);
+    
+    window.duplicityImages = [line1Images, line2Images];
+    
+    // Pré-carregar imagens
+    let loaded = 0;
+    const total = line1Images.filter(i => i.path).length + line2Images.filter(i => i.path).length;
+    
+    const checkDone = () => {
+      loaded++;
+      if (loaded >= total) render();
+    };
+
+    window.duplicityImages.forEach(line => {
+      line.forEach(imgObj => {
+        if (imgObj.path) {
+          imgObj.img = new Image();
+          imgObj.img.onload = checkDone;
+          imgObj.img.src = imgObj.path;
+        }
+      });
+    });
+  };
+
+  const resolveSwipe = () => {
+    const arr = swipeData.arrows;
+    const rank = {"↑→":"A","→↑":"2","→→":"3","→↓":"4","↓→":"5","↓↓":"6","↓←":"7","←↓":"8","←←":"9","←↑":"10","↑←":"J","↑↑":"Q","↑↓":"K"}[arr[0]+arr[1]];
+    const suit = {"↑":"S","→":"H","↓":"C","←":"D"}[arr[2]];
+    const card = (rank && suit) ? rank+suit : "";
+    
+    if (isYellowSwipe) {
+      if (card) {
+        DUPLICITY.setTopCard(card);
+        visorL1.textContent = `TOPO: ${formatCard(card)}`;
+      } else {
+        visorL1.textContent = "ERRO";
+      }
+    } else {
+      const dec = {"↑↑":0,"↑→":10,"→↑":20,"→→":30,"→↓":40,"↓→":50}[arr[3]+arr[4]];
+      const unt = {"↑↑":0,"↑→":1,"→↑":2,"→→":3,"→↓":4,"↓→":5,"↓↓":6,"↓←":7,"←↓":8,"←←":"9"}[arr[5]+arr[6]];
+      const num = (dec !== undefined && unt !== undefined) ? parseInt(dec) + parseInt(unt) : 0;
+      processResult(card, num);
+    }
+    
+    clearTimeout(peekTimer);
+    peekTimer = setTimeout(() => { 
+      if (mode !== "setup" && mode !== "cards" && mode !== "train") { visor.style.opacity = 0; setTimeout(() => { if (mode === "draw") visorL1.textContent = cfg.visor.text; }, 300); }
+      swipeData.arrows = []; if (mode === "swipe") { mode = "draw"; isYellowSwipe = false; }
+    }, cfg.peekDuration * 1000);
+  };
+
+  const processResult = (card, num) => {
+    if (!card || num < 1 || num > 52) { visorL1.textContent = "ERRO"; lastResult = "ERRO"; }
+    else {
+      lastResult = `${formatCard(card)} ${num.toString().padStart(2, '0')}`;
+      lastFooterResult = lastResult;
+      visorL1.textContent = lastResult;
+      window.drawDuplicityResult(card, num);
+    }
+  };
+
+
+
+  window.toggleSetup = () => {
+    if (mode === "setup") { mode = "draw"; setupPanel.classList.add("hidden"); visor.style.opacity = 0; applyCfg(); }
+    else { closeOtherPanels(); mode = "setup"; setupPanel.classList.remove("hidden"); applyCfg(); updateAdjustUI(); }
+  };
+
+  const toggleSwipe = () => {
+    if (mode === "swipe") { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
+    else { closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = false; }
+    swipeData.arrows = [];
+    applyCfg();
+  };
+
+  const toggleYellowSwipe = () => {
+    if (mode === "swipe" && isYellowSwipe) { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
+    else { closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = true; }
+    swipeData.arrows = [];
+    applyCfg();
+  };
+
+  window.toggleCards = (isAdjust = false) => {
+    if (mode === "cards") { mode = "draw"; cardsPanel.classList.add("hidden"); if (lastResult) { visor.style.opacity = cfg.visor.o; clearTimeout(peekTimer); peekTimer = setTimeout(() => { if (mode === "draw") visor.style.opacity = 0; }, cfg.peekDuration * 1000); } else { visor.style.opacity = 0; } isCardsAdjustMode = false; }
+    else { 
+      closeOtherPanels(); mode = "cards"; cardsPanel.classList.remove("hidden"); 
+      isCardsAdjustMode = isAdjust;
+      cardsAdjustControls.classList.toggle("hidden", !isAdjust);
+      visor.style.opacity = cfg.visor.o; visorL1.textContent = lastResult || getExamplePeek(); resetCardInput(); 
+      if (isAdjust) updateAdjustUI();
+    }
+  };
+
+  window.openCardsAdjust = () => { window.setTarget('panelCards'); window.toggleCards(true); };
+
+  const closeOtherPanels = () => {
+    setupPanel.classList.add("hidden"); trainPanel.classList.add("hidden"); cardsPanel.classList.add("hidden");
+    if (mode === "swipe") { mode = "draw"; isYellowSwipe = false; }
+    applyCfg();
+  };
+
+  window.selectCardPart = (type, val) => {
+    if (type === 'rank') cardInputData.rank = val;
+    if (type === 'suit') cardInputData.suit = val;
+    if (type === 'digit') {
+      if (cardInputData.digits.length >= 2) cardInputData.digits = val;
+      else cardInputData.digits += val;
+    }
+    
+    document.querySelectorAll(`#panelCards .card-btn[data-${type}]`).forEach(b => b.classList.remove("active"));
+    const selectedBtn = document.querySelector(`#panelCards .card-btn[data-${type}="${val}"]`);
+    if (selectedBtn) selectedBtn.classList.add("active");
+
+    const suitEmoji = {"S":"♠️","H":"♥️","C":"♣️","D":"♦️"}[cardInputData.suit] || "";
+    cardInputDisplay.textContent = `${cardInputData.rank}${suitEmoji} ${cardInputData.digits.padEnd(2, '-')}`;
+    
+    if (cardInputData.rank && cardInputData.suit && cardInputData.digits.length === 2) {
+      processResult(cardInputData.rank + cardInputData.suit, parseInt(cardInputData.digits));
+      if (!isCardsAdjustMode) window.toggleCards();
+    }
+  };
+
+  const resetCardInput = () => { 
+    cardInputData = { rank: "", suit: "", digits: "" }; 
+    cardInputDisplay.textContent = "--- --"; 
+    document.querySelectorAll("#panelCards .card-btn").forEach(b => b.classList.remove("active"));
+  };
+
+  window.setTarget = (t) => { 
+    adjTarget = t;
+    document.getElementById("oControl").style.display = (t === "visor" || t === "footer" || t.startsWith("panel")) ? "block" : "none";
+    document.getElementById("editTextBtn").style.display = (t === "footer") ? "block" : "none";
+    updateAdjustUI();
+    applyCfg();
+  };
+
+  window.setInputType = (type) => { cfg.inputType = type; applyCfg(); };
+
+  // Funções de Ajuste Aprimoradas
+  const renderStepper = (parent, label, axis, targetKey, step) => {
+    const val = cfg[targetKey][axis];
+    const displayVal = axis === 's' || axis === 'o' ? val.toFixed(2) : Math.round(val);
+    const inputId = `input_${targetKey}_${axis}_${Date.now()}`;
+    const html = `
+      <div class="stepper-control">
+        <span class="stepper-label">${label}</span>
+        <button class="stepper-btn" onclick="window.adjust('${axis}', -${step}, '${targetKey}')">-</button>
+        <input type="number" class="stepper-input" id="${inputId}" value="${displayVal}" 
+               onchange="window.adjustDirect('${axis}', this.value, '${targetKey}')" 
+               onclick="this.select()" step="${step}" />
+        <button class="stepper-btn" onclick="window.adjust('${axis}', ${step}, '${targetKey}')">+</button>
+      </div>
+    `;
+    parent.insertAdjacentHTML('beforeend', html);
+  };
+
+  const renderSlider = (parent, label, axis, targetKey, min, max, step) => {
+    const val = cfg[targetKey][axis];
+    const html = `
+      <div class="slider-control">
+        <div class="slider-label-group">
+          <span class="slider-label">${label}</span>
+          <span class="slider-value-display">${val.toFixed(2)}</span>
+        </div>
+        <input type="range" min="${min}" max="${max}" step="${step}" value="${val}" class="range-slider" 
+               oninput="window.adjust('${axis}', parseFloat(this.value), '${targetKey}', true)">
+      </div>
+    `;
+    parent.insertAdjacentHTML('beforeend', html);
+  };
+
+  window.updateAdjustUI = () => {
+    const setupContainer = document.getElementById("setupAdjusts");
+    const trainContainer = document.getElementById("trainAdjusts");
+    const cardsContainer = document.getElementById("cardsAdjusts");
+    const opacityContainer = document.getElementById("opacitySlider");
+
+    if (setupContainer) setupContainer.innerHTML = "";
+    if (trainContainer) trainContainer.innerHTML = "";
+    if (cardsContainer) cardsContainer.innerHTML = "";
+    if (opacityContainer) opacityContainer.innerHTML = "";
+
+    const currentContainer = mode === 'setup' ? setupContainer : (mode === 'train' ? trainContainer : cardsContainer);
+    if (!currentContainer) return;
+
+    const targetKey = (mode === 'train' && adjustMode === 'number') ? 'number' : adjTarget;
+    let target = cfg[targetKey];
+    if (!target) return;
+
+    // Se estiver no modo treino ajustando o número, tenta pegar o ajuste individual
+    if (targetKey === 'number' && mode === 'train') {
+      const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || "null");
+      if (g?.cfg) target = g.cfg;
+    }
+
+    if (targetKey === 'number') {
+      renderStepper(currentContainer, 'Posição X', 'x', targetKey, 1);
+      renderStepper(currentContainer, 'Posição Y', 'y', targetKey, 1);
+      renderStepper(currentContainer, 'Largura', 's', targetKey, 1);
+      renderStepper(currentContainer, 'Altura', 'h', targetKey, 1);
+    } else {
+      renderStepper(currentContainer, 'Posição X', 'x', targetKey, 1);
+      renderStepper(currentContainer, 'Posição Y', 'y', targetKey, 1);
+      const sStep = targetKey.startsWith('panel') || targetKey === 'toolbar' ? 0.05 : 1;
+      renderStepper(currentContainer, targetKey.startsWith('panel') ? 'Escala' : 'Tamanho', 's', targetKey, sStep);
+    }
+
+    if (opacityContainer && (adjTarget === 'visor' || adjTarget === 'footer' || adjTarget.startsWith('panel'))) {
+      const val = cfg[adjTarget].o || 0.5;
+      const displayVal = Math.round(val * 100);
+      const inputId = `input_opacity_${Date.now()}`;
+      const html = `
+        <div class="stepper-control">
+          <span class="stepper-label">Opacidade (%)</span>
+          <button class="stepper-btn" onclick="window.adjust('o', -0.05, '${adjTarget}')">-</button>
+          <input type="number" class="stepper-input" id="${inputId}" value="${displayVal}" min="5" max="100" step="1"
+                 onchange="window.adjustDirect('o', parseFloat(this.value) / 100, '${adjTarget}')" 
+                 onclick="this.select()" />
+          <button class="stepper-btn" onclick="window.adjust('o', 0.05, '${adjTarget}')">+</button>
+        </div>
+      `;
+      opacityContainer.innerHTML = html;
+    }
+  };
+
+  window.adjust = (axis, val, targetKey = adjTarget, isSlider = false) => {
+    if (mode === 'train' && adjustMode === 'number') targetKey = 'number';
+    let target = cfg[targetKey]; if (!target) return;
+
+    // Se estiver no modo treino ajustando o número, usa/cria o ajuste individual
+    let isIndividual = false;
+    if (targetKey === 'number' && mode === 'train') {
+      const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || "null");
+      target = g?.cfg || JSON.parse(JSON.stringify(cfg.number)); // Herda do global se não existir
+      isIndividual = true;
+    }
+
+    if (isSlider) {
+      target[axis] = val;
+    } else {
+      if (axis === "x") target.x += val;
+      else if (axis === "y") target.y += val;
+      else if (axis === "s") {
+        if (targetKey === "toolbar" || targetKey.startsWith("panel")) target.s = Math.max(0.5, Math.min(2.0, target.s + val));
+        else if (targetKey === "number") { target.s += val; }
+        else if (targetKey === "visor" || targetKey === "footer") { cfg.visor.s = Math.max(5, cfg.visor.s + val); cfg.footer.s = cfg.visor.s; }
+        else target.s += val;
+      }
+      else if (axis === "h" && targetKey === "number") { target.h += val; }
+      else if (axis === "o") {
+        const newVal = Math.max(0.05, Math.min(1.0, (target.o || 0.5) + val));
+        if (targetKey === "visor" || targetKey === "footer") { cfg.visor.o = newVal; cfg.footer.o = newVal; }
+        else target.o = newVal;
+      }
+    }
+
+    if (isIndividual) {
+      const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || JSON.stringify({ s: [] }));
+      g.cfg = target;
+      localStorage.setItem(`v6_g_${trainNum}`, JSON.stringify(g));
+    } else if (targetKey === 'number') {
+      cfg.number = target;
+    }
+
+    applyCfg();
+    updateAdjustUI();
+    if (mode === "train") loadTrain(trainNum);
+  };
+
+  window.adjustDirect = (axis, inputVal, targetKey = adjTarget) => {
+    if (mode === 'train' && adjustMode === 'number') targetKey = 'number';
+    let target = cfg[targetKey]; if (!target) return;
+    const val = parseFloat(inputVal);
+    if (isNaN(val)) return;
+
+    // Se estiver no modo treino ajustando o número, usa/cria o ajuste individual
+    let isIndividual = false;
+    if (targetKey === 'number' && mode === 'train') {
+      const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || "null");
+      target = g?.cfg || JSON.parse(JSON.stringify(cfg.number)); // Herda do global se não existir
+      isIndividual = true;
+    }
+
+    if (axis === "x" || axis === "y") {
+      target[axis] = val;
+    } else if (axis === "s") {
+      if (targetKey === "toolbar" || targetKey.startsWith("panel")) {
+        target.s = Math.max(0.5, Math.min(2.0, val));
+      } else if (targetKey === "visor" || targetKey === "footer") {
+        cfg.visor.s = Math.max(5, val);
+        cfg.footer.s = cfg.visor.s;
+      } else {
+        target.s = val;
+      }
+    } else if (axis === "h" && targetKey === "number") {
+      target.h = val;
+    } else if (axis === "o") {
+      const newVal = Math.max(0.05, Math.min(1.0, val));
+      if (targetKey === "visor" || targetKey === "footer") {
+        cfg.visor.o = newVal;
+        cfg.footer.o = newVal;
+      } else {
+        target.o = newVal;
+      }
+    }
+
+    if (isIndividual) {
+      const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || JSON.stringify({ s: [] }));
+      g.cfg = target;
+      localStorage.setItem(`v6_g_${trainNum}`, JSON.stringify(g));
+    } else if (targetKey === 'number') {
+      cfg.number = target;
+    }
+
+    applyCfg();
+    updateAdjustUI();
+    if (mode === "train") loadTrain(trainNum);
+  };
+
+  window.toggleEmoji = () => { cfg.visor.useEmoji = !cfg.visor.useEmoji; applyCfg(); };
+  window.togglePeekStyle = () => { cfg.visor.peekStyle = cfg.visor.peekStyle === "both" ? "cardOnly" : "both"; applyCfg(); };
+  window.toggleInvertOrder = () => { cfg.visor.inverted = !cfg.visor.inverted; applyCfg(); };
+  cfg.peekDuration = 1.0;
+
+  window.editTargetText = () => {
+    const target = cfg[adjTarget]; if (!target || adjTarget !== "footer") return;
+    const n = prompt(`Novo conteúdo para ${target.label}:`, target.text);
+    if (n !== null) { target.text = n; applyCfg(); }
+  };
+
+  window.openTrainPanel = () => { window.setTarget('panelTrain'); closeOtherPanels(); mode = "train"; trainPanel.classList.remove("hidden"); loadTrain(trainNum || 1); updateAdjustUI(); applyCfg(); };
+  window.toggleTrain = () => { mode = "draw"; trainPanel.classList.add("hidden"); applyCfg(); render(); };
+  window.setAdjustMode = (m) => {
+    adjustMode = m;
+    document.getElementById("modeNumBtn").classList.toggle("active", m === 'number');
+    document.getElementById("modePanelBtn").classList.toggle("active", m === 'panel');
+    updateAdjustUI();
+  };
+
+  const loadTrain = (n) => { 
+    trainNum = Math.max(1, Math.min(52, n)); trainNumEl.textContent = trainNum; strokes = []; 
+    const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || "null");
+    
+    // Prioridade: Ajuste individual do número (g.cfg) ou ajuste global (cfg.number)
+    const nCfg = g?.cfg || cfg.number;
+    const rx = nCfg.x * W / 100, ry = nCfg.y * H / 100;
+    const rw = nCfg.s * W / 100, rh = nCfg.h * H / 100;
+    
+    if (g?.s) g.s.forEach(s => strokes.push({ c: "#111111", p: s.p.map(p => ({ x: rx + p.x * rw, y: ry + p.y * rh })) }));
+    render(); 
+  };
+  window.trainStep = (d) => loadTrain(trainNum + d);
+  window.trainSave = () => {
+    const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || "null");
+    const nCfg = g?.cfg || cfg.number;
+    const rx = nCfg.x * W / 100, ry = nCfg.y * H / 100;
+    const rw = nCfg.s * W / 100, rh = nCfg.h * H / 100;
+    const s = strokes.map(st => ({ p: st.p.map(p => ({ x: (p.x - rx)/rw, y: (p.y - ry)/rh })) }));
+    if (s.length > 0) { 
+      const newData = { s };
+      if (g?.cfg) newData.cfg = g.cfg; // Preserva o ajuste individual ao salvar o desenho
+      localStorage.setItem(`v6_g_${trainNum}`, JSON.stringify(newData)); 
+      if (trainNum < 52) window.trainStep(1); else alert("Salvo!"); 
+    }
+  };
+
+  window.exportGlyphs = () => {
+    const backup = { cfg: cfg, glyphs: {} };
+    for (let i = 1; i <= 52; i++) { const g = localStorage.getItem(`v6_g_${i}`); if (g) backup.glyphs[i] = JSON.parse(g); }
+    const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
+    const url = URL.createObjectURL(blob); const a = document.createElement("a");
+    a.href = url; a.download = `sethi_draw_backup_${Date.now()}.json`; a.click(); URL.revokeObjectURL(url);
+  };
+
+  window.importGlyphs = (event) => {
+    const file = event.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (data.cfg && data.glyphs) {
+          cfg = data.cfg; ensureCfg(); localStorage.setItem("mnem_v6_cfg", JSON.stringify(cfg));
+          Object.keys(data.glyphs).forEach(k => localStorage.setItem(`v6_g_${k}`, JSON.stringify(data.glyphs[k])));
+          applyCfg();
+        } else Object.keys(data).forEach(k => localStorage.setItem(`v6_g_${k}`, JSON.stringify(data[k])));
+        alert("Importado!"); if (mode === "train") loadTrain(trainNum); render();
+      } catch (err) { alert("Erro!"); }
+    };
+    reader.readAsText(file);
+  };
+
+  const initBlueButtonPeek = () => {
+    const blueBtn = document.querySelector('.swatch[data-color="#007AFF"]');
+    if (!blueBtn) return;
+    let holdTimer = null;
+    const startBluePeek = (e) => {
+      if (e.cancelable) e.preventDefault();
+      holdTimer = setTimeout(() => { blueBtn.dataset.isHolding = "true"; if (mode === "draw") { visor.style.opacity = cfg.visor.o; visorL1.textContent = lastResult || getExamplePeek(); } }, 150);
+    };
+    const stopBluePeek = (e) => {
+      clearTimeout(holdTimer);
+      if (blueBtn.dataset.isHolding === "true") { setTimeout(() => { blueBtn.dataset.isHolding = "false"; }, 50); if (mode === "draw") { visor.style.opacity = 0; setTimeout(() => { if (mode === "draw") visorL1.textContent = cfg.visor.text; }, 300); } }
+    };
+    blueBtn.addEventListener("mousedown", startBluePeek); window.addEventListener("mouseup", stopBluePeek);
+    blueBtn.addEventListener("touchstart", startBluePeek, { passive: true }); window.addEventListener("touchend", stopBluePeek, { passive: true });
+  };
+
+  const initEyeButton = (btnId, panelId) => {
+    const btn = document.getElementById(btnId); const panel = document.getElementById(panelId);
+    if (!btn || !panel) return;
+    const startPeek = () => panel.classList.add("transparent-peek"); const stopPeek = () => panel.classList.remove("transparent-peek");
+    btn.addEventListener("mousedown", startPeek); window.addEventListener("mouseup", stopPeek);
+    btn.addEventListener("touchstart", startPeek, { passive: true }); btn.addEventListener("touchend", stopPeek, { passive: true });
+  };
+
+  init();
+})();
