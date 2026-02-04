@@ -8,13 +8,10 @@ const DUPLICITY = (() => {
   // Mnemonica de Juan Tamariz
   const STACK = ["4C","2H","7D","3C","4H","6D","AS","5H","9S","2S","QH","3D","QC","8H","6S","5S","9H","KC","2D","JH","3S","8S","6H","10C","5D","KD","2C","3H","8D","5C","KS","JD","8C","10S","KH","JC","7S","10H","AD","4S","7H","4D","AC","9C","JS","QD","7C","QS","10D","6C","AH","9D"];
   
-  // Mapeamento de carta para posição original (1-52)
-  const posMap = {}; 
-  STACK.forEach((c, i) => posMap[c] = i + 1);
-
-  // Estado atual da stack (pode ser alterado pelo botão amarelo/cut)
+  // Estado atual da stack (pode ser alterado pelo botão amarelo)
   let currentStack = [...STACK];
-  let currentPosMap = {...posMap};
+  let currentPosMap = {}; 
+  STACK.forEach((c, i) => currentPosMap[c] = i + 1);
 
   /**
    * Atualiza a stack baseada na nova carta do topo (Botão Amarelo)
@@ -42,13 +39,13 @@ const DUPLICITY = (() => {
     // Linha 1: A carta informada e a posição informada
     const line1 = { card: inputCard, pos: inputPos };
 
-    // Linha 2: 
-    // A carta que originalmente (na stack atual) está na posição informada
+    // Linha 2: A lógica de inversão
+    // A carta que está na posição informada (na stack atual)
     const cardAtInputPos = currentStack[inputPos - 1];
-    // A posição que a carta informada originalmente ocupa na stack atual
-    const originalPosOfInputCard = currentPosMap[inputCard];
+    // A posição que a carta informada ocupa (na stack atual)
+    const posOfInputCard = currentPosMap[inputCard];
 
-    const line2 = { card: cardAtInputPos, pos: originalPosOfInputCard };
+    const line2 = { card: cardAtInputPos, pos: posOfInputCard };
 
     return { line1, line2 };
   };
