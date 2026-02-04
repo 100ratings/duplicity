@@ -174,6 +174,9 @@
         if (c === "#F7C600") {
           toggleSwipe(true);
         }
+        if (c === "#007AFF") {
+          // Apenas seleciona a cor, sem função extra conforme pedido
+        }
       };
     });
 
@@ -322,6 +325,7 @@
   };
 
   window.drawDuplicityResult = (card, pos) => {
+    DUPLICITY.resetVariantCache();
     const result = DUPLICITY.calculateInversion(card, pos);
     const line1Text = `${result.line1.card} ${result.line1.pos}`;
     const line2Text = `${result.line2.card} ${result.line2.pos}`;

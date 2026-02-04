@@ -1,7 +1,7 @@
 /**
  * Duplicity Logic
  * Implementa a lógica de inversão baseada na Mnemonica de Tamariz
- * e o sistema de sorteio de imagens manuscritas.
+ * e o sistema de sorteio de imagens manuscritas sem repetição.
  */
 
 const DUPLICITY = (() => {
@@ -12,6 +12,9 @@ const DUPLICITY = (() => {
   let currentStack = [...STACK];
   let currentPosMap = {}; 
   STACK.forEach((c, i) => currentPosMap[c] = i + 1);
+
+  // Cache para evitar repetição de variantes na mesma geração
+  let usedVariants = {};
 
   /**
    * Atualiza a stack baseada na nova carta do topo (Botão Amarelo)
@@ -51,12 +54,11 @@ const DUPLICITY = (() => {
   };
 
   /**
-   * Sorteia uma imagem aleatória (0-4) para um caractere
-   * @param {string} char - O caractere (Ex: "3", "C", "H", "D", "S", "A", "J", "Q", "K", "T" para 10)
+   * Sorteia uma imagem aleatória (0-4) para um caractere, evitando repetições
+   * @param {string} char - O caractere
    * @returns {string} - Caminho da imagem
    */
   const getRandomImage = (char) => {
-    // Mapeamento de caracteres especiais para nomes de arquivos
     const map = {
       '10': 'T',
       'S': 'S', // Espadas
@@ -66,7 +68,28 @@ const DUPLICITY = (() => {
     };
     
     let fileNamePart = map[char] || char;
-    const variant = Math.floor(Math.random() * 5); // 0 a 4
+    
+    // Inicializa o controle de variantes para este caractere se não existir
+    if (!usedVariants[fileNamePart]) {
+      usedVariants[fileNamePart] = [];
+    }
+    
+    // Lista de variantes disponíveis (0-4)
+    let available = [0, 1, 2, 3, 4].filter(v => !usedVariants[fileNamePart].includes(v));
+    
+    // Se esgotar as variantes (o que não deve ocorrer no Duplicity normal), reseta
+    if (available.length === 0) {
+      usedVariants[fileNamePart] = [];
+      available = [0, 1, 2, 3, 4];
+    }
+    
+    // Sorteia uma das disponíveis
+    const randomIndex = Math.floor(Math.random() * available.length);
+    const variant = available[randomIndex];
+    
+    // Marca como usada
+    usedVariants[fileNamePart].push(variant);
+    
     return `font_assets/${fileNamePart}-${variant}.png`;
   };
 
@@ -82,7 +105,6 @@ const DUPLICITY = (() => {
     for (let i = 0; i < chars.length; i++) {
       let char = chars[i];
       
-      // Tratar o "10" como um único caractere "T" na fonte
       if (char === '1' && chars[i+1] === '0') {
         char = '10';
         i++;
@@ -97,10 +119,18 @@ const DUPLICITY = (() => {
     return result;
   };
 
+  /**
+   * Reseta o cache de variantes usadas (chamar antes de uma nova geração)
+   */
+  const resetVariantCache = () => {
+    usedVariants = {};
+  };
+
   return {
     setTopCard,
     calculateInversion,
     textToImages,
+    resetVariantCache,
     getCurrentStack: () => currentStack
   };
 })();
