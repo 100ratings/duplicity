@@ -62,18 +62,13 @@
     window.addEventListener('resize', onResize);
     onResize();
     bindEvents();
-    checkOrientation();
-    window.addEventListener('orientationchange', checkOrientation);
+
     updateAdjustUI();
     // Resetar para 4 de paus no topo ao iniciar
     DUPLICITY.setTopCard("4C");
   };
 
-  const checkOrientation = () => {
-    const warning = document.getElementById("orientationWarning");
-    if (window.innerWidth < window.innerHeight) { warning.classList.remove("hidden"); }
-    else { warning.classList.add("hidden"); }
-  };
+
 
   const onResize = () => {
     setTimeout(() => {
@@ -81,7 +76,7 @@
       board.width = W * DPR; board.height = H * DPR;
       board.style.width = W + "px"; board.style.height = H + "px";
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-      applyCfg(); render(); checkOrientation();
+      applyCfg(); render();
     }, 100);
   };
 
@@ -198,7 +193,7 @@
     };
 
     window.onpointerdown = (e) => {
-      if (e.target.closest("#toolbar") || e.target.closest(".panel") || e.target.closest("#activationScreen") || e.target.closest("#installScreen") || e.target.closest("#orientationWarning")) return;
+      if (e.target.closest("#toolbar") || e.target.closest(".panel") || e.target.closest("#activationScreen") || e.target.closest("#installScreen")) return;
       const p = getPt(e); e.preventDefault();
       if (mode === "swipe") { 
         swipeData.start = p; 
