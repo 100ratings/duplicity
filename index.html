@@ -105,7 +105,7 @@
   </div>
 
   <!-- Rodapé Personalizável -->
-  <div id="footer" class="footer-container"></div>
+  <!-- Peek de Apoio removido -->
 
   <!-- Painel de Setup (Secreto) -->
   <section id="setupPanel" class="hidden panel">
@@ -125,7 +125,7 @@
           <button class="setup-btn setup-btn-target" data-target="panelSetup" onclick="window.setTarget('panelSetup')">Painel de Configurações</button>
 
           <button class="setup-btn setup-btn-target" data-target="visor" onclick="window.setTarget('visor')">Peek Principal</button>
-          <button class="setup-btn setup-btn-target" data-target="footer" onclick="window.setTarget('footer')">Peek de Apoio</button>
+          <!-- Peek de Apoio removido -->
           <button class="setup-btn setup-btn-target" data-target="toolbar" onclick="window.setTarget('toolbar')">Barra de Ferramentas</button>
           <button class="setup-btn setup-btn-target" data-target="duplicity" onclick="window.setTarget('duplicity')">Desenho Duplicity</button>
           <button class="setup-btn setup-btn-target" data-target="draw" onclick="window.setTarget('draw')">Ajuste do Traço</button>
@@ -159,6 +159,15 @@
         <label>Ajustes de Posição / Tamanho</label>
         <div id="setupAdjusts">
           <!-- Gerado dinamicamente via JS -->
+        </div>
+      </div>
+
+      <div class="setup-group">
+        <label>Configurações JSON</label>
+        <div class="setup-grid">
+          <button class="setup-btn" onclick="window.exportConfig()">Exportar JSON</button>
+          <button class="setup-btn" onclick="window.importConfig()">Importar JSON</button>
+          <input type="file" id="configFileInput" style="display:none" accept=".json" onchange="window.handleConfigImport(event)">
         </div>
       </div>
       <div class="setup-group" id="oControl" style="display:none">
@@ -251,7 +260,7 @@
       <button class="swatch active" data-color="#111111" style="--c: #111111"></button>
       <button class="swatch" data-color="#F7C600" style="--c: #F7C600"></button>
       <button class="swatch" data-color="#FF3B30" style="--c: #FF3B30"></button>
-      <button class="swatch" data-color="#007AFF" style="--c: #007AFF"></button>
+      <!-- Botão azul removido -->
     </div>
   </div>
 

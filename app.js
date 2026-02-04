@@ -3,7 +3,6 @@
   const ctx = board?.getContext("2d", { alpha: true });
   const visor = document.getElementById("visor");
   const visorL1 = document.getElementById("visorLine1");
-  const footer = document.getElementById("footer");
   const setupPanel = document.getElementById("setupPanel");
   const cardsPanel = document.getElementById("panelCards");
   const cardInputDisplay = document.getElementById("cardInputDisplay");
@@ -24,7 +23,6 @@
   
   let adjTarget = "visor";
   let lastResult = ""; 
-  let lastFooterResult = ""; 
   let isCardsAdjustMode = false;
   let peekTimer = null;
 
@@ -33,14 +31,13 @@
 
   let cfg = JSON.parse(localStorage.getItem("mnem_v6_cfg") || JSON.stringify({
     visor: { x: 50, y: 80, s: 15, lh: 1.1, y2: 0, text: "…", label: "Peek Principal", inverted: false, useEmoji: false, o: 0.3 },
-    footer: { x: 50, y: 90, s: 10, o: 0.3, text: "Duplicity v.1.0.0", label: "Peek de Apoio" },
     toolbar: { x: 50, y: 85, s: 1, label: "Barra de Ferramentas" },
     panelSetup: { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Configurações" },
     panelCards: { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Cartas" },
-    duplicity: { x: 10, y: 30, s: 1, spacingY: 100, spacingX_RS: 0.8, spacingX_CN: 1.0, charW: 60, charH: 80, o: 1.0, label: "Desenho Duplicity" },
+    duplicity: { x: 10, y: 30, s: 1, spacingY: 150, spacingX_RS: 0.8, spacingX_CN: 1.0, charW: 50, charH: 100, o: 1.0, label: "Desenho Duplicity" },
     draw: { blur: 0, label: "Ajuste do Traço" },
     inputType: "swipe",
-    peekDuration: 3.0
+    peekDuration: 1.0
   }));
 
   const ensureCfg = () => {
@@ -48,13 +45,14 @@
     if (cfg.visor.useEmoji === undefined) cfg.visor.useEmoji = false;
     if (cfg.visor.peekStyle === undefined) cfg.visor.peekStyle = "both";
     if (cfg.visor.o === undefined) cfg.visor.o = 0.3;
-    if (cfg.footer.o === undefined) cfg.footer.o = 0.3;
     if (cfg.inputType === undefined) cfg.inputType = "swipe";
-    if (cfg.peekDuration === undefined) cfg.peekDuration = 3.0;
-    if (!cfg.duplicity) cfg.duplicity = { x: 10, y: 30, s: 1, spacingY: 100, spacingX_RS: 0.8, spacingX_CN: 1.0, charW: 60, charH: 80, o: 1.0, label: "Desenho Duplicity" };
-    if (cfg.duplicity.spacingY === undefined) cfg.duplicity.spacingY = 100;
+    if (cfg.peekDuration === undefined || cfg.peekDuration > 1.0) cfg.peekDuration = 1.0;
+    if (!cfg.duplicity) cfg.duplicity = { x: 10, y: 30, s: 1, spacingY: 150, spacingX_RS: 0.8, spacingX_CN: 1.0, charW: 50, charH: 100, o: 1.0, label: "Desenho Duplicity" };
+    if (cfg.duplicity.spacingY === undefined) cfg.duplicity.spacingY = 150;
     if (cfg.duplicity.spacingX_RS === undefined) cfg.duplicity.spacingX_RS = 0.8;
     if (cfg.duplicity.spacingX_CN === undefined) cfg.duplicity.spacingX_CN = 1.0;
+    if (cfg.duplicity.charW === undefined) cfg.duplicity.charW = 50;
+    if (cfg.duplicity.charH === undefined) cfg.duplicity.charH = 100;
     if (cfg.duplicity.o === undefined) cfg.duplicity.o = 1.0;
     if (!cfg.draw) cfg.draw = { blur: 0, label: "Ajuste do Traço" };
   };
@@ -67,6 +65,8 @@
     checkOrientation();
     window.addEventListener('orientationchange', checkOrientation);
     updateAdjustUI();
+    // Resetar para 4 de paus no topo ao iniciar
+    DUPLICITY.setTopCard("4C");
   };
 
   const checkOrientation = () => {
@@ -117,13 +117,6 @@
       }
     }
     
-    footer.style.display = cfg.footer.visible ? "block" : "none";
-    footer.style.left = (cfg.footer.x * W / 100) + "px";
-    footer.style.top = (cfg.footer.y * H / 100) + "px";
-    footer.style.fontSize = cfg.footer.s + "px";
-    footer.style.opacity = cfg.footer.o;
-    footer.textContent = lastFooterResult || cfg.footer.text;
-
     const panels = { "toolbar": "toolbar", "setupPanel": "panelSetup", "panelCards": "panelCards" };
     Object.keys(panels).forEach(id => {
       const el = document.getElementById(id);
@@ -217,7 +210,7 @@
       if (!currentStroke) return;
       const p = getPt(e); e.preventDefault();
       currentStroke.p.push(p);
-      render(); // Renderiza durante o movimento para ver o traço
+      render(); 
     };
 
     window.onpointerup = (e) => {
@@ -241,7 +234,6 @@
   const render = () => {
     ctx.clearRect(0, 0, board.width, board.height);
     
-    // 1. Desenhar Imagens do Duplicity
     if (window.duplicityImages && window.duplicityImages.length > 0) {
       const d = cfg.duplicity;
       const startX = (d.x * W / 100); 
@@ -260,26 +252,22 @@
           if (imgObj.path && imgObj.img) {
             ctx.drawImage(imgObj.img, currentX, startY + (lineIdx * lineSpacingY), charWidth, charHeight);
             
-            // Lógica de espaçamento X customizado
-            // Se for valor (charIdx 0 ou 1 dependendo do 10) e o próximo for naipe
-            // Ou se for carta e o próximo for número
             let isTen = (line[charIdx].char === '10');
             let nextChar = line[charIdx+1];
             
             if (nextChar && nextChar.char === ' ') {
-               currentX += charWidth * d.spacingX_CN; // Espaço entre carta e número
+               currentX += charWidth * d.spacingX_CN; 
             } else {
-               currentX += charWidth * d.spacingX_RS; // Espaço entre valor e naipe
+               currentX += charWidth * d.spacingX_RS; 
             }
           } else if (imgObj.char === ' ') {
-            currentX += charWidth * 0.5; // Espaço do caractere vazio
+            currentX += charWidth * 0.5; 
           }
         });
       });
       ctx.restore();
     }
 
-    // 2. Desenhar Traços Manuais
     ctx.save();
     if (cfg.draw.blur > 0) {
       ctx.shadowBlur = cfg.draw.blur;
@@ -323,14 +311,14 @@
         const decStr = dec !== undefined ? (dec/10).toString() : "?";
         if (len === 5) content = `${card} ${decStr}`;
         else if (len === 7) {
-          const unt = {"↑↑":0,"↑→":1,"→↑":2,"→→":3,"→↓":4,"↓→":5,"↓↓":6,"↓←":7,"←↓":8,"←←":9}[arr[5]+arr[6]];
+          const unt = {"↑↑":0,"↑→":1,"→↑":2,"→→":3,"→↓":4,"↓→":5,"↓↓":6,"↓←":7,"←↓":8,"←←":"9"}[arr[5]+arr[6]];
           const num = (dec !== undefined && unt !== undefined) ? parseInt(dec) + parseInt(unt) : "??";
           content = `${card} ${num}`;
         }
       }
     }
     visorL1.textContent = content;
-    visor.style.opacity = cfg.visor.o; // Força visibilidade
+    visor.style.opacity = cfg.visor.o; 
   };
 
   window.drawDuplicityResult = (card, pos) => {
@@ -353,7 +341,11 @@
       imgObj.img = new Image();
       imgObj.img.onload = () => {
         loaded++;
-        if (loaded >= total) render();
+        if (loaded >= total) {
+          render();
+          // Após gerar o desenho, volta a considerar o 4 de paus no topo
+          DUPLICITY.setTopCard("4C");
+        }
       };
       imgObj.img.src = imgObj.path;
     });
@@ -374,7 +366,7 @@
       }
     } else {
       const dec = {"↑↑":0,"↑→":10,"→↑":20,"→→":30,"→↓":40,"↓→":50}[arr[3]+arr[4]];
-      const unt = {"↑↑":0,"↑→":1,"→↑":2,"→→":3,"→↓":4,"↓→":5,"↓↓":6,"↓←":7,"←↓":8,"←←":9}[arr[5]+arr[6]];
+      const unt = {"↑↑":0,"↑→":1,"→↑":2,"→→":3,"→↓":4,"↓→":5,"↓↓":6,"↓←":7,"←↓":8,"←←":"9"}[arr[5]+arr[6]];
       const num = (dec !== undefined && unt !== undefined) ? parseInt(dec) + parseInt(unt) : 0;
       processResult(card, num);
     }
@@ -390,7 +382,6 @@
     if (!card || num < 1 || num > 52) { visorL1.textContent = "ERRO"; lastResult = "ERRO"; }
     else {
       lastResult = `${formatCard(card)} ${num.toString().padStart(2, '0')}`;
-      lastFooterResult = lastResult;
       visorL1.textContent = lastResult;
       window.drawDuplicityResult(card, num);
     }
@@ -529,6 +520,40 @@
     container.appendChild(createStepper("Posição X", "panelCards", "x", 0.5));
     container.appendChild(createStepper("Posição Y", "panelCards", "y", 0.5));
     container.appendChild(createStepper("Tamanho", "panelCards", "s", 0.05));
+  };
+
+  // Funções de Importação/Exportação JSON
+  window.exportConfig = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cfg, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "duplicity_config.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
+  window.importConfig = () => {
+    document.getElementById('configFileInput').click();
+  };
+
+  window.handleConfigImport = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedCfg = JSON.parse(e.target.result);
+        cfg = importedCfg;
+        ensureCfg();
+        applyCfg();
+        updateAdjustUI();
+        alert("Configurações importadas com sucesso!");
+      } catch (err) {
+        alert("Erro ao importar arquivo JSON.");
+      }
+    };
+    reader.readAsText(file);
   };
 
   init();

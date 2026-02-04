@@ -61,7 +61,7 @@ html, body {
   top: 85%;
   transform: translateX(-50%);
   height: 62px;
-  min-width: 320px;
+  min-width: 260px;
   max-width: 95%;
   background: var(--glass);
   backdrop-filter: blur(30px);
@@ -131,16 +131,7 @@ html, body {
 
 /* Indicação visual interna removida conforme solicitado */
 .swatch.swipe-active::before {
-  content: "";
-  position: absolute;
-  top: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 6px;
-  height: 6px;
-  background: #fff;
-  border-radius: 50%;
-  box-shadow: 0 0 10px rgba(255,255,255,0.8);
+  display: none;
 }
 
 /* Animação para o ponto no Visor Principal */
