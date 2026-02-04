@@ -37,6 +37,7 @@
     toolbar: { x: 50, y: 85, s: 1, label: "Barra de Ferramentas" },
     panelSetup: { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Configurações" },
     panelCards: { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Cartas" },
+    duplicity: { x: 10, y: 30, s: 1, spacing: 100, charW: 60, charH: 80, label: "Desenho Duplicity" },
     inputType: "swipe",
     peekDuration: 3.0
   }));
@@ -49,6 +50,7 @@
     if (cfg.footer.o === undefined) cfg.footer.o = 0.3;
     if (cfg.inputType === undefined) cfg.inputType = "swipe";
     if (cfg.peekDuration === undefined) cfg.peekDuration = 3.0;
+    if (!cfg.duplicity) cfg.duplicity = { x: 10, y: 30, s: 1, spacing: 100, charW: 60, charH: 80, label: "Desenho Duplicity" };
   };
   ensureCfg();
 
@@ -193,8 +195,6 @@
       render();
     };
 
-    let dragData = { active: false, startX: 0, startY: 0, initialVal: 0, axis: null, targetKey: null };
-
     window.onpointerdown = (e) => {
       if (e.target.closest("#toolbar") || e.target.closest(".panel") || e.target.closest("#activationScreen") || e.target.closest("#installScreen") || e.target.closest("#orientationWarning")) return;
       const p = getPt(e); e.preventDefault();
@@ -207,6 +207,7 @@
     };
 
     window.onpointermove = (e) => {
+      if (mode === "swipe") return; // Não desenha durante o swipe
       if (!currentStroke) return;
       const p = getPt(e); e.preventDefault();
       currentStroke.p.push(p);
@@ -237,20 +238,20 @@
 
   const render = () => {
     ctx.clearRect(0, 0, board.width, board.height);
-    strokes.forEach(s => {
-      ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = 6; ctx.strokeStyle = s.c;
-      ctx.beginPath(); ctx.moveTo(s.p[0].x, s.p[0].y);
-      for (let i = 1; i < s.p.length; i++) ctx.lineTo(s.p[i].x, s.p[i].y);
-      ctx.stroke(); ctx.restore();
-    });
-
+    
+    // 1. Desenhar Imagens do Duplicity (Primeiro para ficarem "por baixo" se desejar)
     if (window.duplicityImages && window.duplicityImages.length > 0) {
-      const startX = W * 0.1; 
-      const startY = H * 0.3; 
-      const charWidth = 60;   
-      const charHeight = 80;  
-      const lineSpacing = 100; 
+      const d = cfg.duplicity;
+      const startX = (d.x * W / 100); 
+      const startY = (d.y * H / 100); 
+      const charWidth = d.charW * d.s;   
+      const charHeight = d.charH * d.s;  
+      const lineSpacing = d.spacing * d.s; 
 
+      ctx.save();
+      // Técnica para remover fundo branco das imagens
+      ctx.globalCompositeOperation = 'multiply';
+      
       window.duplicityImages.forEach((line, lineIdx) => {
         let currentX = startX;
         line.forEach(imgObj => {
@@ -262,7 +263,16 @@
           }
         });
       });
+      ctx.restore();
     }
+
+    // 2. Desenhar Traços Manuais
+    strokes.forEach(s => {
+      ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = 6; ctx.strokeStyle = s.c;
+      ctx.beginPath(); ctx.moveTo(s.p[0].x, s.p[0].y);
+      for (let i = 1; i < s.p.length; i++) ctx.lineTo(s.p[i].x, s.p[i].y);
+      ctx.stroke(); ctx.restore();
+    });
   };
 
   const getArrow = (a, b) => {
@@ -461,12 +471,12 @@
   window.adjust = (axis, delta, key) => {
     cfg[key][axis] += delta;
     if (axis === 'o') cfg[key][axis] = Math.max(0, Math.min(1, cfg[key][axis]));
-    applyCfg(); updateAdjustUI();
+    applyCfg(); updateAdjustUI(); render();
   };
 
   window.adjustDirect = (axis, val, key) => {
     cfg[key][axis] = parseFloat(val);
-    applyCfg(); updateAdjustUI();
+    applyCfg(); updateAdjustUI(); render();
   };
 
   window.openCardsAdjust = () => {
