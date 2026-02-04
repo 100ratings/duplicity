@@ -37,7 +37,8 @@
     toolbar: { x: 50, y: 85, s: 1, label: "Barra de Ferramentas" },
     panelSetup: { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Configurações" },
     panelCards: { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Cartas" },
-    duplicity: { x: 10, y: 30, s: 1, spacing: 100, charW: 60, charH: 80, label: "Desenho Duplicity" },
+    duplicity: { x: 10, y: 30, s: 1, spacingY: 100, spacingX_RS: 0.8, spacingX_CN: 1.0, charW: 60, charH: 80, o: 1.0, label: "Desenho Duplicity" },
+    draw: { blur: 0, label: "Ajuste do Traço" },
     inputType: "swipe",
     peekDuration: 3.0
   }));
@@ -50,7 +51,12 @@
     if (cfg.footer.o === undefined) cfg.footer.o = 0.3;
     if (cfg.inputType === undefined) cfg.inputType = "swipe";
     if (cfg.peekDuration === undefined) cfg.peekDuration = 3.0;
-    if (!cfg.duplicity) cfg.duplicity = { x: 10, y: 30, s: 1, spacing: 100, charW: 60, charH: 80, label: "Desenho Duplicity" };
+    if (!cfg.duplicity) cfg.duplicity = { x: 10, y: 30, s: 1, spacingY: 100, spacingX_RS: 0.8, spacingX_CN: 1.0, charW: 60, charH: 80, o: 1.0, label: "Desenho Duplicity" };
+    if (cfg.duplicity.spacingY === undefined) cfg.duplicity.spacingY = 100;
+    if (cfg.duplicity.spacingX_RS === undefined) cfg.duplicity.spacingX_RS = 0.8;
+    if (cfg.duplicity.spacingX_CN === undefined) cfg.duplicity.spacingX_CN = 1.0;
+    if (cfg.duplicity.o === undefined) cfg.duplicity.o = 1.0;
+    if (!cfg.draw) cfg.draw = { blur: 0, label: "Ajuste do Traço" };
   };
   ensureCfg();
 
@@ -207,11 +213,11 @@
     };
 
     window.onpointermove = (e) => {
-      if (mode === "swipe") return; // Não desenha durante o swipe
+      if (mode === "swipe") return; 
       if (!currentStroke) return;
       const p = getPt(e); e.preventDefault();
       currentStroke.p.push(p);
-      drawSeg(currentStroke.p[currentStroke.p.length-2], p, currentStroke.c);
+      render(); // Renderiza durante o movimento para ver o traço
     };
 
     window.onpointerup = (e) => {
@@ -231,35 +237,42 @@
   };
 
   const getPt = (e) => { const r = board.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
-  const drawSeg = (p1, p2, c) => {
-    ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = 6; ctx.strokeStyle = c;
-    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke(); ctx.restore();
-  };
-
+  
   const render = () => {
     ctx.clearRect(0, 0, board.width, board.height);
     
-    // 1. Desenhar Imagens do Duplicity (Primeiro para ficarem "por baixo" se desejar)
+    // 1. Desenhar Imagens do Duplicity
     if (window.duplicityImages && window.duplicityImages.length > 0) {
       const d = cfg.duplicity;
       const startX = (d.x * W / 100); 
       const startY = (d.y * H / 100); 
       const charWidth = d.charW * d.s;   
       const charHeight = d.charH * d.s;  
-      const lineSpacing = d.spacing * d.s; 
+      const lineSpacingY = d.spacingY * d.s; 
 
       ctx.save();
-      // Técnica para remover fundo branco das imagens
+      ctx.globalAlpha = d.o;
       ctx.globalCompositeOperation = 'multiply';
       
       window.duplicityImages.forEach((line, lineIdx) => {
         let currentX = startX;
-        line.forEach(imgObj => {
+        line.forEach((imgObj, charIdx) => {
           if (imgObj.path && imgObj.img) {
-            ctx.drawImage(imgObj.img, currentX, startY + (lineIdx * lineSpacing), charWidth, charHeight);
-            currentX += charWidth * 0.8; 
+            ctx.drawImage(imgObj.img, currentX, startY + (lineIdx * lineSpacingY), charWidth, charHeight);
+            
+            // Lógica de espaçamento X customizado
+            // Se for valor (charIdx 0 ou 1 dependendo do 10) e o próximo for naipe
+            // Ou se for carta e o próximo for número
+            let isTen = (line[charIdx].char === '10');
+            let nextChar = line[charIdx+1];
+            
+            if (nextChar && nextChar.char === ' ') {
+               currentX += charWidth * d.spacingX_CN; // Espaço entre carta e número
+            } else {
+               currentX += charWidth * d.spacingX_RS; // Espaço entre valor e naipe
+            }
           } else if (imgObj.char === ' ') {
-            currentX += charWidth;
+            currentX += charWidth * 0.5; // Espaço do caractere vazio
           }
         });
       });
@@ -267,12 +280,23 @@
     }
 
     // 2. Desenhar Traços Manuais
-    strokes.forEach(s => {
-      ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = 6; ctx.strokeStyle = s.c;
+    ctx.save();
+    if (cfg.draw.blur > 0) {
+      ctx.shadowBlur = cfg.draw.blur;
+      ctx.shadowColor = color;
+      ctx.filter = `blur(${cfg.draw.blur/2}px)`;
+    }
+    
+    const drawOne = (s) => {
+      ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = 6; ctx.strokeStyle = s.c;
       ctx.beginPath(); ctx.moveTo(s.p[0].x, s.p[0].y);
       for (let i = 1; i < s.p.length; i++) ctx.lineTo(s.p[i].x, s.p[i].y);
-      ctx.stroke(); ctx.restore();
-    });
+      ctx.stroke();
+    };
+
+    strokes.forEach(drawOne);
+    if (currentStroke) drawOne(currentStroke);
+    ctx.restore();
   };
 
   const getArrow = (a, b) => {
@@ -306,6 +330,7 @@
       }
     }
     visorL1.textContent = content;
+    visor.style.opacity = cfg.visor.o; // Força visibilidade
   };
 
   window.drawDuplicityResult = (card, pos) => {
@@ -445,7 +470,7 @@
       div.innerHTML = `
         <span class="stepper-label">${label}</span>
         <button class="stepper-btn" onclick="window.adjust('${axis}', ${-step}, '${key}')">-</button>
-        <span class="stepper-value">${target[axis].toFixed(axis === 's' && (key.startsWith('panel') || key === 'toolbar') ? 2 : 1)}</span>
+        <span class="stepper-value">${target[axis].toFixed(axis === 's' && (key.startsWith('panel') || key === 'toolbar') ? 2 : (axis.includes('spacingX') ? 2 : 1))}</span>
         <button class="stepper-btn" onclick="window.adjust('${axis}', ${step}, '${key}')">+</button>
       `;
       return div;
@@ -454,6 +479,16 @@
     if (target.x !== undefined) container.appendChild(createStepper("Posição X", adjTarget, "x", 0.5));
     if (target.y !== undefined) container.appendChild(createStepper("Posição Y", adjTarget, "y", 0.5));
     if (target.s !== undefined) container.appendChild(createStepper("Tamanho", adjTarget, "s", adjTarget.startsWith('panel') || adjTarget === 'toolbar' ? 0.05 : 1));
+
+    if (adjTarget === "duplicity") {
+      container.appendChild(createStepper("Espaço Valor/Naipe", "duplicity", "spacingX_RS", 0.05));
+      container.appendChild(createStepper("Espaço Carta/Número", "duplicity", "spacingX_CN", 0.05));
+      container.appendChild(createStepper("Espaçamento Y", "duplicity", "spacingY", 5));
+    }
+
+    if (adjTarget === "draw") {
+      container.appendChild(createStepper("Blur do Traço", "draw", "blur", 1));
+    }
 
     if (target.o !== undefined) {
       document.getElementById("oControl").style.display = "block";
@@ -471,6 +506,7 @@
   window.adjust = (axis, delta, key) => {
     cfg[key][axis] += delta;
     if (axis === 'o') cfg[key][axis] = Math.max(0, Math.min(1, cfg[key][axis]));
+    if (axis === 'blur') cfg[key][axis] = Math.max(0, cfg[key][axis]);
     applyCfg(); updateAdjustUI(); render();
   };
 
