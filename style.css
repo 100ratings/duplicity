@@ -33,17 +33,13 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
 }
 
-/* Forçar visualização Landscape em telas Portrait */
-@media screen and (orientation: portrait) {
-  body {
-    width: 100vh;
-    height: 100vw;
-    transform: rotate(90deg);
-    transform-origin: top left;
-    position: absolute;
-    top: 0;
-    left: 100%;
-  }
+/* Forçar preenchimento total para evitar telas brancas */
+html, body {
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
 }
 
 #board {

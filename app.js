@@ -62,6 +62,13 @@
     window.addEventListener('resize', onResize);
     onResize();
     bindEvents();
+    
+    // Tentar forçar landscape via API de Orientação
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('landscape').catch(err => {
+        console.log("A trava de orientação requer tela cheia ou interação prévia em alguns navegadores.");
+      });
+    }
 
     updateAdjustUI();
     // Resetar para 4 de paus no topo ao iniciar
@@ -193,6 +200,11 @@
     };
 
     window.onpointerdown = (e) => {
+      // Tentar forçar orientação novamente no primeiro toque (necessário em alguns navegadores)
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
+      }
+
       if (e.target.closest("#toolbar") || e.target.closest(".panel") || e.target.closest("#activationScreen") || e.target.closest("#installScreen")) return;
       const p = getPt(e); e.preventDefault();
       if (mode === "swipe") { 
