@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Criador de Fonte Duplicity</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --primary: #007AFF;
+            --bg: #f2f2f7;
+            --card: #ffffff;
+            --text: #1c1c1e;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-y: auto;
+        }
+
+        header {
+            background: var(--card);
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 1px 0 rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        h1 { margin: 0; font-size: 18px; }
+        .subtitle { font-size: 12px; color: #8e8e93; margin-top: 4px; }
+
+        #main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            position: relative;
+        }
+
+        /* Área do Canvas */
+        .canvas-wrapper {
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            border-radius: 4px;
+            background: #fff;
+            overflow: hidden;
+            /* Aspect Ratio 1:2 visualmente na tela */
+            width: 100%;
+            max-width: 300px; 
+            aspect-ratio: 1/2;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: crosshair;
+            /* Grid de fundo para referência (não sai no print) */
+            background-image: 
+                linear-gradient(#e5e5ea 1px, transparent 1px),
+                linear-gradient(90deg, #e5e5ea 1px, transparent 1px);
+            background-size: 50px 50px;
+            background-position: center top;
+            touch-action: none;
+        }
+
+        /* Instruções Flutuantes */
+        .instruction-overlay {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.9);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+            pointer-events: none;
+            white-space: nowrap;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .current-char {
+            font-size: 24px;
+            color: var(--primary);
+            font-weight: 800;
+        }
+
+        /* Controles */
+        .controls {
+            width: 100%;
+            max-width: 400px;
+            padding: 15px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            background: var(--bg);
+        }
+
+        button {
+            background: var(--card);
+            border: none;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            active: scale(0.98);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        button.primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        button.danger {
+            color: #ff3b30;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* Barra de Progresso */
+        .progress-container {
+            width: 100%;
+            height: 4px;
+            background: #d1d1d6;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 20;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* Tela Final */
+        #finish-screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 30px;
+            height: 100%;
+        }
+
+        .success-icon { font-size: 60px; margin-bottom: 20px; }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 100;
+        }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <header id="header">
+        <h1>Criador de Fonte</h1>
+        <div class="subtitle" id="statusText">Carregando...</div>
+    </header>
+
+    <div id="main-container">
+        <div class="canvas-wrapper">
+            <div class="instruction-overlay">
+                Desenhe: <span id="charDisplay" class="current-char">?</span>
+            </div>
+            <!-- Canvas real com tamanho 500x1000 -->
+            <canvas id="drawingCanvas" width="500" height="1000"></canvas>
+        </div>
+    </div>
+
+    <div class="settings-bar" style="width: 100%; max-width: 400px; padding: 0 15px; margin-bottom: 10px;">
+        <label style="font-size: 12px; color: #8e8e93; font-weight: 600; display: block; margin-bottom: 5px;">Espessura do Traço: <span id="widthVal">45</span>px</label>
+        <input type="range" min="10" max="100" value="45" style="width: 100%;" oninput="updateWidth(this.value)">
+    </div>
+
+    <div class="controls" id="controls">
+        <button class="danger" onclick="clearCanvas()">Limpar</button>
+        <button onclick="undo()">Desfazer</button>
+        <button class="primary" onclick="nextStep()">Salvar e Próximo</button>
+    </div>
+
+    <div id="finish-screen">
+        <div class="success-icon">🎉</div>
+        <h2>Tudo Pronto!</h2>
+        <p>Você desenhou todas as 95 imagens.</p>
+        <p style="font-size: 14px; color: #666; margin-bottom: 30px;">Clique abaixo para baixar o arquivo ZIP. Extraia o conteúdo dentro da pasta <strong>font_assets</strong> do seu projeto.</p>
+        <button class="primary" onclick="downloadZip()" style="width: 100%; max-width: 300px;">Baixar font_assets.zip</button>
+    </div>
+
+    <div id="toast" class="toast">Salvo!</div>
+
+    <script>
+        // Configuração dos Símbolos
+        // Ordem: Números, Letras Especiais, Naipes
+        const symbols = [
+            { label: '0', filename: '0' },
+            { label: '1', filename: '1' },
+            { label: '2', filename: '2' },
+            { label: '3', filename: '3' },
+            { label: '4', filename: '4' },
+            { label: '5', filename: '5' },
+            { label: '6', filename: '6' },
+            { label: '7', filename: '7' },
+            { label: '8', filename: '8' },
+            { label: '9', filename: '9' },
+            { label: 'A', filename: 'A' },
+            { label: '10', filename: 'T' }, // 10 é salvo como T
+            { label: 'J', filename: 'J' },
+            { label: 'Q', filename: 'Q' },
+            { label: 'K', filename: 'K' },
+            { label: '♠️', filename: 'S' },
+            { label: '♥️', filename: 'H' },
+            { label: '♣️', filename: 'C' },
+            { label: '♦️', filename: 'D' }
+        ];
+
+        const VARIANTS_PER_SYMBOL = 5;
+        let queue = [];
+        let currentStep = 0;
+        let zip = new JSZip();
+        
+        // Canvas Setup
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let strokes = [];
+        let currentStroke = [];
+        let strokeWidth = 45;
+
+        function updateWidth(val) {
+            strokeWidth = parseInt(val);
+            document.getElementById('widthVal').textContent = strokeWidth;
+        }
+
+        // Inicialização
+        function init() {
+            // Gerar fila de tarefas
+            symbols.forEach(sym => {
+                for(let i=0; i < VARIANTS_PER_SYMBOL; i++) {
+                    queue.push({
+                        ...sym,
+                        variant: i
+                    });
+                }
+            });
+
+            updateUI();
+            setupCanvasEvents();
+        }
+
+        function updateUI() {
+            if (currentStep >= queue.length) {
+                showFinishScreen();
+                return;
+            }
+
+            const item = queue[currentStep];
+            const progress = (currentStep / queue.length) * 100;
+
+            document.getElementById('progressBar').style.width = `${progress}%`;
+            document.getElementById('charDisplay').textContent = item.label;
+            document.getElementById('statusText').textContent = `Variante ${item.variant + 1} de ${VARIANTS_PER_SYMBOL} • Total: ${currentStep + 1}/${queue.length}`;
+            
+            clearCanvas(false); // Limpa visualmente mas mantém histórico se precisar (aqui resetamos)
+            strokes = [];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Lógica de Desenho
+        function setupCanvasEvents() {
+            // Touch
+            canvas.addEventListener('touchstart', startDraw, {passive: false});
+            canvas.addEventListener('touchmove', draw, {passive: false});
+            canvas.addEventListener('touchend', endDraw);
+            
+            // Mouse
+            canvas.addEventListener('mousedown', startDraw);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', endDraw);
+            canvas.addEventListener('mouseleave', endDraw);
+        }
+
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+            
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function startDraw(e) {
+            e.preventDefault();
+            isDrawing = true;
+            const pos = getPos(e);
+            currentStroke = [pos];
+            
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = strokeWidth;
+            ctx.strokeStyle = '#000000';
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const pos = getPos(e);
+            currentStroke.push(pos);
+            
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+        }
+
+        function endDraw() {
+            if (!isDrawing) return;
+            isDrawing = false;
+            strokes.push({ points: [...currentStroke], width: strokeWidth });
+        }
+
+        // Ações
+        function clearCanvas(keepHistory = false) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (!keepHistory) strokes = [];
+        }
+
+        function undo() {
+            strokes.pop();
+            redraw();
+        }
+
+        function redraw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            strokes.forEach(stroke => {
+                const points = stroke.points;
+                if (points.length < 1) return;
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.lineWidth = stroke.width;
+                ctx.strokeStyle = '#000000';
+                for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(points[i].x, points[i].y);
+                }
+                ctx.stroke();
+            });
+        }
+
+        function nextStep() {
+            if (strokes.length === 0) {
+                alert("Por favor, desenhe algo antes de continuar.");
+                return;
+            }
+
+            // Salvar imagem no ZIP
+            const item = queue[currentStep];
+            const filename = `${item.filename}-${item.variant}.png`;
+            
+            // Converter canvas para blob (PNG transparente)
+            canvas.toBlob(function(blob) {
+                zip.file(filename, blob);
+                currentStep++;
+                showToast();
+                updateUI();
+            });
+        }
+
+        function showFinishScreen() {
+            document.getElementById('header').style.display = 'none';
+            document.getElementById('main-container').style.display = 'none';
+            document.getElementById('controls').style.display = 'none';
+            document.getElementById('finish-screen').style.display = 'flex';
+        }
+
+        function downloadZip() {
+            zip.generateAsync({type:"blob"})
+            .then(function(content) {
+                // Criar link de download
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(content);
+                a.download = "font_assets.zip";
+                a.click();
+            });
+        }
+
+        function showToast() {
+            const t = document.getElementById('toast');
+            t.classList.add('show');
+            setTimeout(() => {
+                t.classList.remove('show');
+            }, 1500);
+        }
+
+        // Iniciar
+        init();
+    </script>
+</body>
+</html>

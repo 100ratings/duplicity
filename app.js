@@ -372,6 +372,17 @@
       if (card) {
         DUPLICITY.setTopCard(card);
         visorL1.textContent = `TOPO: ${formatCard(card)}`;
+        
+        clearTimeout(peekTimer);
+        peekTimer = setTimeout(() => {
+          color = "#FF3B30";
+          document.querySelectorAll(".swatch").forEach(b => b.classList.remove("active"));
+          const redBtn = document.querySelector('.swatch[data-color="#FF3B30"]');
+          if (redBtn) redBtn.classList.add("active");
+          if (cfg.inputType === "cards") window.toggleCards(false);
+          else toggleSwipe(false);
+        }, cfg.peekDuration * 1000);
+        return;
       } else {
         visorL1.textContent = "ERRO";
       }
@@ -480,7 +491,7 @@
 
     if (target.x !== undefined) container.appendChild(createStepper("Posição X", adjTarget, "x", 0.5));
     if (target.y !== undefined) container.appendChild(createStepper("Posição Y", adjTarget, "y", 0.5));
-    if (target.s !== undefined) container.appendChild(createStepper("Tamanho", adjTarget, "s", adjTarget.startsWith('panel') || adjTarget === 'toolbar' ? 0.05 : 1));
+    if (target.s !== undefined) container.appendChild(createStepper("Tamanho", adjTarget, "s", adjTarget === 'duplicity' ? 0.1 : (adjTarget.startsWith('panel') || adjTarget === 'toolbar' ? 0.05 : 1)));
 
     if (adjTarget === "duplicity") {
       container.appendChild(createStepper("Espaço Valor/Naipe", "duplicity", "spacingX_RS", 0.05));
