@@ -55,6 +55,22 @@
     if (cfg.duplicity.charH === undefined) cfg.duplicity.charH = 100;
     if (cfg.duplicity.o === undefined) cfg.duplicity.o = 1.0;
     if (!cfg.draw) cfg.draw = { blur: 0, label: "Ajuste do Traço" };
+
+    const splitKeys = ['visor', 'toolbar', 'panelSetup', 'panelCards', 'duplicity'];
+    if (!cfg.landscape || !cfg.portrait) {
+      cfg.landscape = {};
+      cfg.portrait = {};
+      splitKeys.forEach(k => {
+        cfg.landscape[k] = JSON.parse(JSON.stringify(cfg[k]));
+        cfg.portrait[k] = JSON.parse(JSON.stringify(cfg[k]));
+      });
+    }
+    ['landscape', 'portrait'].forEach(m => {
+      if (!cfg[m]) cfg[m] = {};
+      splitKeys.forEach(k => {
+        if (!cfg[m][k]) cfg[m][k] = JSON.parse(JSON.stringify(cfg[k]));
+      });
+    });
   };
   ensureCfg();
 
@@ -83,6 +99,15 @@
       board.width = W * DPR; board.height = H * DPR;
       board.style.width = W + "px"; board.style.height = H + "px";
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      
+      const orient = H > W ? 'portrait' : 'landscape';
+      const splitKeys = ['visor', 'toolbar', 'panelSetup', 'panelCards', 'duplicity'];
+      splitKeys.forEach(k => {
+        if (cfg[orient] && cfg[orient][k]) {
+          cfg[k] = cfg[orient][k];
+        }
+      });
+
       applyCfg(); render();
     }, 100);
   };
