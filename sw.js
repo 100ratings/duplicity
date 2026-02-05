@@ -1,14 +1,30 @@
-const CACHE_NAME = 'sethidraw-v6.1.2';
+const CACHE_NAME = 'sethidraw-v6.1.3';
+
+// Gerar lista de imagens para cache (todas as variantes 0-4)
+const CHARS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'S', 'H', 'C', 'D', '0', '1'];
+const FONT_ASSETS = [];
+CHARS.forEach(char => {
+  for (let i = 0; i < 5; i++) {
+    FONT_ASSETS.push(`./font_assets/${char}-${i}.png`);
+  }
+});
+
 const ASSETS = [
   './',
   './index.html',
   './style.css?v=6.1.2',
   './app.js?v=6.1.2',
+  './config.js',
+  './license-manager.js',
+  './duplicity-logic.js',
+  './activation-init.js',
+  './custom-drawings.js',
   './manifest.json?v=2',
   './favicon.ico?v=2',
   './apple-touch-icon.png?v=2',
   './icons/icon-192.png?v=2',
-  './icons/icon-512.png?v=2'
+  './icons/icon-512.png?v=2',
+  ...FONT_ASSETS
 ];
 
 // Instalação: Salva todos os arquivos no cache imediatamente
