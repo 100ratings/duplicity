@@ -169,8 +169,6 @@
 
     document.getElementById("invertOrderBtn").textContent = cfg.visor.inverted ? "Ordem: 05 4H → 4H 05" : "Ordem: 4H 05 → 05 4H";
     document.getElementById("togglePeekStyleBtn").textContent = `Estilo: ${cfg.visor.peekStyle === 'cardOnly' ? 'Apenas Carta' : 'Carta + Posição'}`;
-    const peekPreview = document.getElementById("peekPreview");
-    if (peekPreview) peekPreview.textContent = getExamplePeek();
 
     document.querySelectorAll(".setup-btn-target").forEach(btn => {
       btn.classList.toggle("active", btn.dataset.target === adjTarget);
@@ -474,7 +472,7 @@
 
   window.toggleSetup = () => {
     if (mode === "setup") { mode = "draw"; setupPanel.classList.add("hidden"); visor.style.opacity = 0; applyCfg(); }
-    else { closeOtherPanels(); mode = "setup"; setupPanel.classList.remove("hidden"); applyCfg(); updateAdjustUI(); }
+    else { closeOtherPanels(); mode = "setup"; setupPanel.classList.remove("hidden"); adjTarget = "panelSetup"; applyCfg(); updateAdjustUI(); }
   };
 
   const toggleSwipe = (yellow = false) => {
