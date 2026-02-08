@@ -32,9 +32,9 @@
 
   let cfg = JSON.parse(localStorage.getItem("mnem_v6_cfg") || JSON.stringify({
     visor: { x: 50, y: 80, s: 15, lh: 1.1, y2: 0, text: "…", label: "Peek Principal", inverted: false, useEmoji: false, o: 0.3 },
-    toolbar: { x: 50, y: 85, s: 1, label: "Barra de Ferramentas" },
-    panelSetup: { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Configurações" },
-    panelCards: { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Cartas" },
+    toolbar: { x: 50, y: 90, s: 1, label: "Barra de Ferramentas" },
+    panelSetup: { x: 50, y: 10, s: 1, o: 0.6, label: "Painel de Configurações" },
+    panelCards: { x: 50, y: 10, s: 1, o: 0.6, label: "Painel de Cartas" },
     duplicity: { x: 10, y: 30, s: 1, spacingY: 150, spacingX_RS: 0.8, spacingX_CN: 1.0, charW: 50, charH: 100, o: 1.0, label: "Desenho Duplicity" },
     draw: { blur: 0, label: "Ajuste do Traço" },
     inputType: "swipe",
@@ -129,7 +129,7 @@
     
     if (mode === "setup" || mode === "cards") {
       visor.style.opacity = cfg.visor.o;
-      visorL1.textContent = lastResult || getExamplePeek();
+      visorL1.textContent = getExamplePeek();
       visorL1.classList.remove("loading-dots-animation");
     } else if (mode === "draw") {
       visor.style.opacity = 0;
@@ -180,32 +180,44 @@
   };
 
   const bindEvents = () => {
-    document.querySelectorAll(".swatch").forEach(s => {
-      s.onclick = (e) => {
-        e.stopPropagation();
-        const now = Date.now();
-        const c = s.dataset.color;
-        document.querySelectorAll(".swatch").forEach(b => b.classList.remove("active"));
-        s.classList.add("active");
-        color = c;
+    const handleSwatchClick = (s) => {
+      const c = s.dataset.color;
+      document.querySelectorAll(".swatch").forEach(b => b.classList.remove("active"));
+      s.classList.add("active");
+      color = c;
 
-        if (c === "#FF3B30") {
-          if (cfg.inputType === "cards") window.toggleCards(false);
-          else toggleSwipe(false);
+      if (c === "#FF3B30") {
+        if (cfg.inputType === "cards") window.toggleCards(false);
+        else toggleSwipe(false);
+      }
+      if (c === "#F7C600") {
+        toggleSwipe(true);
+      }
+    };
+
+    document.querySelectorAll(".swatch").forEach(s => {
+      let pressTimer = null;
+
+      s.addEventListener("pointerdown", (e) => {
+        if (!e.isPrimary) return;
+        if (s.dataset.color === "#111111") {
+          pressTimer = setTimeout(() => {
+            window.toggleSetup();
+            pressTimer = null;
+          }, 3000);
         }
-        if (c === "#111111") {
-          if (now - lastTapTimes.black < 500) tapCounts.black++;
-          else tapCounts.black = 1;
-          lastTapTimes.black = now;
-          if (tapCounts.black >= 5) { window.toggleSetup(); tapCounts.black = 0; }
-        }
-        if (c === "#F7C600") {
-          toggleSwipe(true);
-        }
-        if (c === "#007AFF") {
-          // Apenas seleciona a cor, sem função extra conforme pedido
-        }
-      };
+      });
+
+      s.addEventListener("pointerup", (e) => {
+        if (!e.isPrimary) return;
+        if (s.dataset.color === "#111111" && !pressTimer) return; // Long press triggered
+        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+        handleSwatchClick(s);
+      });
+
+      s.addEventListener("pointerleave", () => {
+        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+      });
     });
 
     document.getElementById("clearBtn").onclick = (e) => { 

@@ -157,7 +157,7 @@ html, body {
 /* Visor Unificado */
 .visor-container, .footer-container {
   position: absolute;
-  z-index: 500;
+  z-index: 2500;
   pointer-events: none;
   text-align: center;
   font-size: 15px;
