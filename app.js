@@ -17,6 +17,7 @@
   let swipeData = { start: null, arrows: [] };
   let cardInputData = { rank: "", suit: "", digits: "" };
   let isYellowSwipe = false; 
+  let activePointerId = null;
   
   let tapCounts = { red: 0, yellow: 0, black: 0 };
   let lastTapTimes = { red: 0, yellow: 0, black: 0 };
@@ -224,31 +225,41 @@
       render();
     };
 
-    window.onpointerdown = (e) => {
-      // Tentar forçar orientação novamente no primeiro toque (necessário em alguns navegadores)
-      if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('landscape').catch(() => {});
-      }
+    board.addEventListener("pointerdown", (e) => {
+      if (!e.isPrimary) return;
+      if (activePointerId !== null) return;
+      
+      e.preventDefault();
+      activePointerId = e.pointerId;
+      board.setPointerCapture(activePointerId);
 
-      if (e.target.closest("#toolbar") || e.target.closest(".panel") || e.target.closest("#activationScreen") || e.target.closest("#installScreen")) return;
-      const p = getPt(e); e.preventDefault();
+      // Tentar forçar orientação
+      if (screen.orientation && screen.orientation.lock) { screen.orientation.lock('landscape').catch(() => {}); }
+
+      const p = getPt(e);
       if (mode === "swipe") { 
         swipeData.start = p; 
         applyCfg();
         return; 
       }
       currentStroke = { c: color, p: [p] };
-    };
+    }, { passive: false });
 
-    window.onpointermove = (e) => {
-      if (mode === "swipe") return; 
+    board.addEventListener("pointermove", (e) => {
+      if (e.pointerId !== activePointerId) return;
+      e.preventDefault();
+
+      if (mode === "swipe") return;
       if (!currentStroke) return;
-      const p = getPt(e); e.preventDefault();
+      const p = getPt(e);
       currentStroke.p.push(p);
       render(); 
-    };
+    }, { passive: false });
 
-    window.onpointerup = (e) => {
+    board.addEventListener("pointerup", (e) => {
+      if (e.pointerId !== activePointerId) return;
+      e.preventDefault();
+
       if (mode === "swipe" && swipeData.start) {
         const arrow = getArrow(swipeData.start, getPt(e));
         swipeData.start = null;
@@ -261,7 +272,17 @@
         }
       }
       if (currentStroke) { strokes.push(currentStroke); currentStroke = null; render(); }
-    };
+      activePointerId = null;
+    }, { passive: false });
+
+    board.addEventListener("pointercancel", (e) => {
+      if (e.pointerId !== activePointerId) return;
+      e.preventDefault();
+      activePointerId = null;
+      currentStroke = null;
+      swipeData.start = null;
+      render();
+    }, { passive: false });
   };
 
   const getPt = (e) => { const r = board.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
