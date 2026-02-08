@@ -204,7 +204,7 @@
           pressTimer = setTimeout(() => {
             window.toggleSetup();
             pressTimer = null;
-          }, 3000);
+          }, 1500);
         }
       });
 
