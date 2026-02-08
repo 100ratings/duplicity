@@ -18,6 +18,7 @@
   let cardInputData = { rank: "", suit: "", digits: "" };
   let isYellowSwipe = false; 
   let activePointerId = null;
+  let isSetupPeek = false;
   
   let tapCounts = { red: 0, yellow: 0, black: 0 };
   let lastTapTimes = { red: 0, yellow: 0, black: 0 };
@@ -234,6 +235,61 @@
       strokes.pop();
       render();
     };
+
+    // Botão Olho no Painel de Setup
+    const eyeBtn = document.getElementById("eyeBtn");
+    if (eyeBtn) {
+      eyeBtn.onclick = () => {
+        isSetupPeek = true;
+        setupPanel.classList.add("hidden");
+        const floatBtn = document.getElementById("floatingEyeBtn");
+        if (floatBtn) floatBtn.classList.remove("hidden");
+        mode = "draw"; // Permite desenhar e usar toolbar
+        applyCfg();
+      };
+    }
+
+    // Lógica do Botão Flutuante (Arrastar e Clicar)
+    const floatBtn = document.getElementById("floatingEyeBtn");
+    if (floatBtn) {
+      let isDraggingFloat = false;
+      let floatDragStart = { x: 0, y: 0 };
+      let startClickPos = { x: 0, y: 0 };
+
+      floatBtn.addEventListener("pointerdown", (e) => {
+        if (!e.isPrimary) return;
+        isDraggingFloat = false;
+        floatBtn.setPointerCapture(e.pointerId);
+        const rect = floatBtn.getBoundingClientRect();
+        // Fixar posição absoluta para evitar pulos ao iniciar o drag
+        floatBtn.style.right = 'auto';
+        floatBtn.style.left = rect.left + 'px';
+        floatBtn.style.top = rect.top + 'px';
+        floatDragStart = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        startClickPos = { x: e.clientX, y: e.clientY };
+        e.preventDefault();
+      });
+
+      floatBtn.addEventListener("pointermove", (e) => {
+        if (!floatBtn.hasPointerCapture(e.pointerId)) return;
+        e.preventDefault();
+        let newX = e.clientX - floatDragStart.x;
+        let newY = e.clientY - floatDragStart.y;
+        // Limites da tela
+        newX = Math.max(10, Math.min(W - 54, newX));
+        newY = Math.max(10, Math.min(H - 54, newY));
+        floatBtn.style.left = newX + "px";
+        floatBtn.style.top = newY + "px";
+      });
+
+      floatBtn.addEventListener("pointerup", (e) => {
+        floatBtn.releasePointerCapture(e.pointerId);
+        // Se moveu pouco, considera clique
+        if (Math.hypot(e.clientX - startClickPos.x, e.clientY - startClickPos.y) < 5) {
+          window.toggleSetup();
+        }
+      });
+    }
 
     board.addEventListener("pointerdown", (e) => {
       if (!e.isPrimary) return;
@@ -471,6 +527,10 @@
   };
 
   window.toggleSetup = () => {
+    const floatBtn = document.getElementById("floatingEyeBtn");
+    if (floatBtn) floatBtn.classList.add("hidden");
+    isSetupPeek = false;
+
     if (mode === "setup") { mode = "draw"; setupPanel.classList.add("hidden"); visor.style.opacity = 0; applyCfg(); }
     else { closeOtherPanels(); mode = "setup"; setupPanel.classList.remove("hidden"); adjTarget = "panelSetup"; applyCfg(); updateAdjustUI(); }
   };
