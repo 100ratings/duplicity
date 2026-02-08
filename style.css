@@ -1,5 +1,5 @@
 :root {
-  --bg: #000000;
+  --bg: #ffffff;
   --glass: rgba(124, 124, 124, 0.85);
   --accent: #007AFF;
   --text-dim: rgba(0, 0, 0, 0.3);
@@ -28,7 +28,7 @@ html, body {
   width: 100%;
   margin: 0;
   padding: 0;
-  background: #000000;
+  background: #ffffff;
   overflow: hidden;
   position: relative;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
