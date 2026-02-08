@@ -57,9 +57,9 @@ html, body {
 /* Aviso de Orientação */
 #orientationWarning {
   position: fixed; inset: 0; width: 100vw; height: 100dvh;
-  background: #000000; z-index: 11000;
+  background: #ffffff; z-index: 11000;
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
-  color: white; padding: 40px; padding-bottom: calc(40px + env(safe-area-inset-bottom)); touch-action: none;
+  color: #000000; padding: 40px; padding-bottom: calc(40px + env(safe-area-inset-bottom)); touch-action: none;
 }
 #orientationWarning.hidden { display: none; }
 .warning-content svg { margin-bottom: 15px; animation: rotate 2s infinite ease-in-out; }

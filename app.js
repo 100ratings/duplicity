@@ -79,6 +79,7 @@
   ensureCfg();
 
   const init = () => {
+    checkOrientation();
     window.addEventListener('resize', onResize);
     onResize();
     bindEvents();
