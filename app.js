@@ -39,7 +39,8 @@
     duplicity: { x: 10, y: 30, s: 1, spacingY: 150, spacingX_RS: 0.8, spacingX_CN: 1.0, charW: 50, charH: 100, o: 1.0, label: "Desenho Duplicity" },
     draw: { blur: 0, label: "Ajuste do Traço" },
     inputType: "swipe",
-    peekDuration: 1.0
+    peekDuration: 1.0,
+    forceLandscape: false
   }));
 
   const ensureCfg = () => {
@@ -49,6 +50,7 @@
     if (cfg.visor.o === undefined) cfg.visor.o = 0.3;
     if (cfg.inputType === undefined) cfg.inputType = "swipe";
     if (cfg.peekDuration === undefined || cfg.peekDuration > 1.0) cfg.peekDuration = 1.0;
+    if (cfg.forceLandscape === undefined) cfg.forceLandscape = false;
     if (!cfg.duplicity) cfg.duplicity = { x: 10, y: 30, s: 1, spacingY: 150, spacingX_RS: 0.8, spacingX_CN: 1.0, charW: 50, charH: 100, o: 1.0, label: "Desenho Duplicity" };
     if (cfg.duplicity.spacingY === undefined) cfg.duplicity.spacingY = 150;
     if (cfg.duplicity.spacingX_RS === undefined) cfg.duplicity.spacingX_RS = 0.8;
@@ -121,6 +123,17 @@
     return cfg.visor.inverted ? `${numStr} ${cardStr}` : `${cardStr} ${numStr}`;
   };
 
+  const checkOrientation = () => {
+    const warning = document.getElementById("orientationWarning");
+    if (!warning) return;
+    const isPortrait = H > W;
+    if (cfg.forceLandscape && isPortrait) {
+      warning.classList.remove("hidden");
+    } else {
+      warning.classList.add("hidden");
+    }
+  };
+
   const applyCfg = () => {
     visor.style.display = cfg.visor.visible ? "block" : "none";
     visor.style.left = (cfg.visor.x * W / 100) + "px";
@@ -170,12 +183,16 @@
 
     document.getElementById("invertOrderBtn").textContent = cfg.visor.inverted ? "Ordem: 05 4H → 4H 05" : "Ordem: 4H 05 → 05 4H";
     document.getElementById("togglePeekStyleBtn").textContent = `Estilo: ${cfg.visor.peekStyle === 'cardOnly' ? 'Apenas Carta' : 'Carta + Posição'}`;
+    
+    const forceBtn = document.getElementById("forceLandscapeBtn");
+    if (forceBtn) forceBtn.textContent = `Forçar Landscape: ${cfg.forceLandscape ? 'ON' : 'OFF'}`;
 
     document.querySelectorAll(".setup-btn-target").forEach(btn => {
       btn.classList.toggle("active", btn.dataset.target === adjTarget);
     });
 
     localStorage.setItem("mnem_v6_cfg", JSON.stringify(cfg));
+    checkOrientation();
   };
 
   const bindEvents = () => {
@@ -583,6 +600,7 @@
   window.toggleEmoji = () => { cfg.visor.useEmoji = !cfg.visor.useEmoji; applyCfg(); };
   window.toggleInvertOrder = () => { cfg.visor.inverted = !cfg.visor.inverted; applyCfg(); };
   window.togglePeekStyle = () => { cfg.visor.peekStyle = (cfg.visor.peekStyle === "both" ? "cardOnly" : "both"); applyCfg(); };
+  window.toggleForceLandscape = () => { cfg.forceLandscape = !cfg.forceLandscape; applyCfg(); };
   window.setTarget = (t) => { adjTarget = t; updateAdjustUI(); applyCfg(); };
 
   const updateAdjustUI = () => {
