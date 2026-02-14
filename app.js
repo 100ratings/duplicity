@@ -387,24 +387,30 @@
       ctx.globalCompositeOperation = 'multiply';
       
       window.duplicityImages.forEach((line, lineIdx) => {
-        let currentX = startX;
-        
-        // Identificar onde começa a parte numérica (após o espaço)
+        // 1. Calcular a largura da parte da CARTA (antes do espaço)
         let spaceIdx = line.findIndex(item => item.char === ' ');
+        let cardWidth = 0;
+        for (let i = 0; i < spaceIdx; i++) {
+          if (line[i].path) cardWidth += charWidth * d.spacingX_RS;
+        }
+        
+        // 2. Definir uma largura de referência para a carta (baseada em 2 caracteres: Rank + Naipe)
+        // Se a carta for "10", ela tem 3 caracteres (1, 0, Naipe), então subtraímos a diferença
+        // para que o espaço comece sempre no mesmo lugar X.
+        let referenceCardWidth = (charWidth * d.spacingX_RS) * 2;
+        let xOffset = referenceCardWidth - cardWidth;
+
+        let currentX = startX + xOffset;
         
         line.forEach((imgObj, charIdx) => {
           if (imgObj.path && imgObj.img) {
             let drawX = currentX;
             
-            // Lógica de centralização para números (caracteres após o espaço)
+            // Lógica de centralização para números (após o espaço)
             if (spaceIdx !== -1 && charIdx > spaceIdx) {
               const numChars = line.slice(spaceIdx + 1).filter(item => item.path);
               if (numChars.length === 1) {
-                // Se for apenas 1 dígito (ex: 1-9), centraliza no espaço de dois dígitos
                 drawX += (charWidth * d.spacingX_RS) / 2;
-              } else if (numChars.length === 2) {
-                // Se for 2 dígitos (ex: 10), o primeiro dígito fica na posição normal 
-                // e o segundo segue o espaçamento RS, já ocupando o bloco naturalmente.
               }
             }
             
