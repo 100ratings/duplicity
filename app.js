@@ -387,26 +387,29 @@
       ctx.globalCompositeOperation = 'multiply';
       
       window.duplicityImages.forEach((line, lineIdx) => {
-        // 1. Calcular a largura da parte da CARTA (antes do espaço)
         let spaceIdx = line.findIndex(item => item.char === ' ');
-        let cardWidth = 0;
-        for (let i = 0; i < spaceIdx; i++) {
-          if (line[i].path) cardWidth += charWidth * d.spacingX_RS;
-        }
         
-        // 2. Definir uma largura de referência para a carta (baseada em 2 caracteres: Rank + Naipe)
-        // Se a carta for "10", ela tem 3 caracteres (1, 0, Naipe), então subtraímos a diferença
-        // para que o espaço comece sempre no mesmo lugar X.
-        let referenceCardWidth = (charWidth * d.spacingX_RS) * 2;
-        let xOffset = referenceCardWidth - cardWidth;
+        // 1. Calcular a largura real da CARTA nesta linha
+        let currentCardChars = line.slice(0, spaceIdx).filter(item => item.path);
+        let currentCardWidth = 0;
+        currentCardChars.forEach((_, i) => {
+          currentCardWidth += (i === currentCardChars.length - 1) ? charWidth : charWidth * d.spacingX_RS;
+        });
 
-        let currentX = startX + xOffset;
+        // 2. Referência: largura de uma carta de 2 caracteres (ex: 4C)
+        let referenceCardWidth = (charWidth * d.spacingX_RS) + charWidth;
+        
+        // 3. Centralizar a carta: se a carta for menor ou maior que a referência, 
+        // ajustamos o X inicial da linha para que o CENTRO da carta coincida.
+        let cardXOffset = (referenceCardWidth - currentCardWidth) / 2;
+
+        let currentX = startX + cardXOffset;
         
         line.forEach((imgObj, charIdx) => {
           if (imgObj.path && imgObj.img) {
             let drawX = currentX;
             
-            // Lógica de centralização para números (após o espaço)
+            // 4. Lógica de centralização para números (após o espaço)
             if (spaceIdx !== -1 && charIdx > spaceIdx) {
               const numChars = line.slice(spaceIdx + 1).filter(item => item.path);
               if (numChars.length === 1) {
@@ -418,12 +421,13 @@
             
             let nextChar = line[charIdx+1];
             if (nextChar && nextChar.char === ' ') {
-               currentX += charWidth * d.spacingX_CN; 
+               // Pula para a posição fixa do número após a carta
+               currentX = startX + referenceCardWidth + (charWidth * d.spacingX_CN); 
             } else {
                currentX += charWidth * d.spacingX_RS; 
             }
           } else if (imgObj.char === ' ') {
-            currentX += charWidth * 0.5; 
+            // O espaço em si não precisa ser desenhado, a lógica acima já posiciona o próximo caractere
           }
         });
       });
