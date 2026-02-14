@@ -154,7 +154,7 @@ const CustomDrawings = (() => {
     }
 
     // Fallback para desenho original
-    const map = { '10': 'T', 'S': 'S', 'H': 'H', 'C': 'C', 'D': 'D' };
+    const map = { 'S': 'S', 'H': 'H', 'C': 'C', 'D': 'D' };
     const fileNamePart = map[character] || character;
     return `font_assets/${fileNamePart}-${variantIndex}.png`;
   };

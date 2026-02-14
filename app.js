@@ -36,7 +36,7 @@
     toolbar: { x: 50, y: 90, s: 1, label: "Barra de Ferramentas" },
     panelSetup: { x: 50, y: 10, s: 1, o: 0.6, label: "Painel de Configurações" },
     panelCards: { x: 50, y: 10, s: 1, o: 0.6, label: "Painel de Cartas" },
-    duplicity: { x: 10, y: 30, s: 1, spacingY: 150, spacingX_RS: 0.8, spacingX_CN: 1.0, charW: 50, charH: 100, o: 1.0, offsetX2: 0, offsetY2: 0, label: "Desenho Duplicity" },
+    duplicity: { x: 10, y: 30, s: 1, spacingY: 150, spacingX_RS: 0.8, spacingX_CN: 1.0, charW: 50, charH: 100, o: 1.0, label: "Desenho Duplicity" },
     draw: { blur: 0, label: "Ajuste do Traço" },
     inputType: "swipe",
     peekDuration: 1.0,
@@ -58,8 +58,6 @@
     if (cfg.duplicity.charW === undefined) cfg.duplicity.charW = 50;
     if (cfg.duplicity.charH === undefined) cfg.duplicity.charH = 100;
     if (cfg.duplicity.o === undefined) cfg.duplicity.o = 1.0;
-    if (cfg.duplicity.offsetX2 === undefined) cfg.duplicity.offsetX2 = 0;
-    if (cfg.duplicity.offsetY2 === undefined) cfg.duplicity.offsetY2 = 0;
     if (!cfg.draw) cfg.draw = { blur: 0, label: "Ajuste do Traço" };
 
     const splitKeys = ['visor', 'toolbar', 'panelSetup', 'panelCards', 'duplicity'];
@@ -389,13 +387,11 @@
       ctx.globalCompositeOperation = 'multiply';
       
       window.duplicityImages.forEach((line, lineIdx) => {
-        let currentX = startX + (lineIdx === 1 ? d.offsetX2 : 0);
-        let currentY = startY + (lineIdx * lineSpacingY) + (lineIdx === 1 ? d.offsetY2 : 0);
+        let currentX = startX;
         line.forEach((imgObj, charIdx) => {
           if (imgObj.path && imgObj.img) {
-            ctx.drawImage(imgObj.img, currentX, currentY, charWidth, charHeight);
+            ctx.drawImage(imgObj.img, currentX, startY + (lineIdx * lineSpacingY), charWidth, charHeight);
             
-            let isTen = (line[charIdx].char === '10');
             let nextChar = line[charIdx+1];
             
             if (nextChar && nextChar.char === ' ') {
@@ -635,8 +631,6 @@
       container.appendChild(createStepper("Espaço Valor/Naipe", "duplicity", "spacingX_RS", 0.05));
       container.appendChild(createStepper("Espaço Carta/Número", "duplicity", "spacingX_CN", 0.05));
       container.appendChild(createStepper("Espaçamento Y", "duplicity", "spacingY", 5));
-      container.appendChild(createStepper("Ajuste X Linha 2", "duplicity", "offsetX2", 2));
-      container.appendChild(createStepper("Ajuste Y Linha 2", "duplicity", "offsetY2", 2));
     }
 
     if (adjTarget === "draw") {

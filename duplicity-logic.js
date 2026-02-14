@@ -60,7 +60,6 @@ const DUPLICITY = (() => {
    */
   const getRandomImage = (char) => {
     const map = {
-      '10': 'T',
       'S': 'S', // Espadas
       'H': 'H', // Copas
       'C': 'C', // Paus
@@ -106,8 +105,11 @@ const DUPLICITY = (() => {
       let char = chars[i];
       
       if (char === '1' && chars[i+1] === '0') {
-        char = '10';
+        // Quando for '10', adiciona o desenho do '1' e do '0' separadamente
+        result.push({ char: '1', path: getRandomImage('1') });
+        result.push({ char: '0', path: getRandomImage('0') });
         i++;
+        continue;
       }
       
       if (char === ' ') {

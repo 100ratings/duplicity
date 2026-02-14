@@ -78,7 +78,7 @@
     Object.keys(grouped).sort().forEach(char => {
       grouped[char].sort((a, b) => a.variant_index - b.variant_index);
       grouped[char].forEach(drawing => {
-        const displayChar = char === '10' ? '10' : char;
+        const displayChar = char;
         const suitEmoji = {'S':'♠️','H':'♥️','C':'♣️','D':'♦️'}[char] || '';
         const label = suitEmoji || displayChar;
 
