@@ -388,12 +388,29 @@
       
       window.duplicityImages.forEach((line, lineIdx) => {
         let currentX = startX;
+        
+        // Identificar onde começa a parte numérica (após o espaço)
+        let spaceIdx = line.findIndex(item => item.char === ' ');
+        
         line.forEach((imgObj, charIdx) => {
           if (imgObj.path && imgObj.img) {
-            ctx.drawImage(imgObj.img, currentX, startY + (lineIdx * lineSpacingY), charWidth, charHeight);
+            let drawX = currentX;
+            
+            // Lógica de centralização para números (caracteres após o espaço)
+            if (spaceIdx !== -1 && charIdx > spaceIdx) {
+              const numChars = line.slice(spaceIdx + 1).filter(item => item.path);
+              if (numChars.length === 1) {
+                // Se for apenas 1 dígito (ex: 1-9), centraliza no espaço de dois dígitos
+                drawX += (charWidth * d.spacingX_RS) / 2;
+              } else if (numChars.length === 2) {
+                // Se for 2 dígitos (ex: 10), o primeiro dígito fica na posição normal 
+                // e o segundo segue o espaçamento RS, já ocupando o bloco naturalmente.
+              }
+            }
+            
+            ctx.drawImage(imgObj.img, drawX, startY + (lineIdx * lineSpacingY), charWidth, charHeight);
             
             let nextChar = line[charIdx+1];
-            
             if (nextChar && nextChar.char === ' ') {
                currentX += charWidth * d.spacingX_CN; 
             } else {
