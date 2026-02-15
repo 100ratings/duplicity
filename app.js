@@ -27,6 +27,8 @@
   let lastResult = ""; 
   let isCardsAdjustMode = false;
   let peekTimer = null;
+  let wakeLock = null;
+  let isWakeLockEnabled = false;
 
   // Imagens do Duplicity
   window.duplicityImages = [];
@@ -83,6 +85,12 @@
     window.addEventListener('resize', onResize);
     onResize();
     bindEvents();
+
+    document.addEventListener('visibilitychange', async () => {
+      if (isWakeLockEnabled && document.visibilityState === 'visible') {
+        await requestWakeLock();
+      }
+    });
     
     // Tentar forçar landscape via API de Orientação
     if (screen.orientation && screen.orientation.lock) {
@@ -196,6 +204,36 @@
     checkOrientation();
   };
 
+  const requestWakeLock = async () => {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      if (!wakeLock) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        isWakeLockEnabled = true;
+        console.log('Wake Lock ativo');
+        wakeLock.addEventListener('release', () => {
+          console.log('Wake Lock liberado');
+          wakeLock = null;
+          // Se ainda deve estar habilitado, tenta reativar na próxima oportunidade
+          if (isWakeLockEnabled && document.visibilityState === 'visible') {
+            requestWakeLock();
+          }
+        });
+      }
+    } catch (err) {
+      console.error(`${err.name}, ${err.message}`);
+    }
+  };
+
+  const releaseWakeLock = async () => {
+    // Função mantida mas não será mais chamada por ações comuns como solicitado
+    isWakeLockEnabled = false;
+    if (wakeLock) {
+      await wakeLock.release();
+      wakeLock = null;
+    }
+  };
+
   const bindEvents = () => {
     const handleSwatchClick = (s) => {
       const c = s.dataset.color;
@@ -204,6 +242,7 @@
       color = c;
 
       if (c === "#FF3B30") {
+        requestWakeLock();
         if (cfg.inputType === "cards") window.toggleCards(false);
         else toggleSwipe(false);
       }
@@ -242,6 +281,7 @@
       strokes = []; 
       swipeData.arrows = []; 
       window.duplicityImages = []; 
+      // releaseWakeLock(); // Removido conforme solicitado: não desativar ao limpar
       if (mode === "swipe") { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
       if (mode === "cards") window.toggleCards();
       applyCfg();
